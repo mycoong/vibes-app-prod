@@ -9,8 +9,6 @@ type Scene = {
   imagePromptA: string;
   imagePromptB: string;
   videoPrompt: string;
-
-  // optional persisted
   audioBase64?: string;
   audioMime?: string;
 };
@@ -34,16 +32,26 @@ async function copyText(text: string) {
   await navigator.clipboard.writeText(t);
 }
 
+function safeJsonParse(raw: string) {
+  try {
+    return JSON.parse(raw);
+  } catch {
+    return null;
+  }
+}
+
 function buildBulk18(scenes: Scene[], meta?: Partial<GenerateMeta>) {
   const header = [
+    "VIBES CANVAS • BULK IMAGE PROMPTS (18)",
+    "",
     "GLOBAL STYLE (apply to every scene):",
-    "- Vertical 9:16 cinematic diorama miniature",
+    "- Vertical 9:16 cinematic miniature diorama",
     "- Macro tilt-shift, shallow depth of field, tiny handcrafted details",
     "- Ultra realistic miniature materials (wood, paint, fabric, dust), museum-grade diorama",
     "- Dramatic cinematic lighting, volumetric rays, rich texture",
     "- No text, no watermark, no hands, no modern objects, no CGI look",
     "",
-    "CONTEXT (for consistency):",
+    "PROJECT CONTEXT:",
     `- Topic: ${meta?.topic ?? "-"}`,
     `- Category: ${meta?.style ?? "-"}`,
     `- Format: ${meta?.format ?? "-"}`,
@@ -51,7 +59,7 @@ function buildBulk18(scenes: Scene[], meta?: Partial<GenerateMeta>) {
     `- Genre: ${meta?.genre ?? "-"}`,
     `- Template: ${meta?.template ?? "-"}`,
     "",
-    "OUTPUT FORMAT:",
+    "OUTPUT:",
     "",
   ].join("\n");
 
@@ -64,12 +72,65 @@ function buildBulk18(scenes: Scene[], meta?: Partial<GenerateMeta>) {
   return blocks.join("\n");
 }
 
-function safeJsonParse(raw: string) {
-  try {
-    return JSON.parse(raw);
-  } catch {
-    return null;
-  }
+function buildScenePack(scene: Scene, idx1: number) {
+  const n = idx1;
+  return [
+    `VIBES CANVAS • SCENE PACK #${n}`,
+    "",
+    "IMAGE PROMPT A:",
+    String(scene.imagePromptA || "").trim(),
+    "",
+    "IMAGE PROMPT B:",
+    String(scene.imagePromptB || "").trim(),
+    "",
+    "VIDEO PROMPT:",
+    String(scene.videoPrompt || "").trim(),
+    "",
+    "NARRATIVE:",
+    String(scene.narrative || "").trim(),
+    "",
+  ].join("\n");
+}
+
+function buildChatPrompt(scene: Scene, idx1: number, meta?: Partial<GenerateMeta> | null) {
+  // Ini murni helper teks: siap paste ke model mana pun.
+  const ctx = [
+    `PROJECT: Vibes App (Diorama Panels)`,
+    meta?.topic ? `TOPIC: ${meta.topic}` : null,
+    meta?.style ? `CATEGORY: ${meta.style}` : null,
+    meta?.format ? `FORMAT: ${meta.format}` : null,
+    meta?.audience ? `AUDIENCE: ${meta.audience}` : null,
+    meta?.genre ? `GENRE: ${meta.genre}` : null,
+    meta?.template ? `TEMPLATE: ${meta.template}` : null,
+  ].filter(Boolean);
+
+  return [
+    `VIBES CANVAS • CHAT PROMPT • SCENE #${idx1}`,
+    "",
+    ...ctx,
+    "",
+    "TASK:",
+    "- Kamu adalah asisten kreatif. Aku akan memberi Narrative + Prompt A/B + Prompt Video.",
+    "- Bantu rapikan (tanpa mengubah inti) dan hasilkan versi final yang lebih tajam, konsisten, dan siap dipakai.",
+    "- Jangan tambahkan watermark/teks di gambar. Fokus detail miniature diorama, macro tilt-shift, cinematic lighting.",
+    "",
+    "NARRATIVE:",
+    String(scene.narrative || "").trim(),
+    "",
+    "IMAGE PROMPT A:",
+    String(scene.imagePromptA || "").trim(),
+    "",
+    "IMAGE PROMPT B:",
+    String(scene.imagePromptB || "").trim(),
+    "",
+    "VIDEO PROMPT:",
+    String(scene.videoPrompt || "").trim(),
+    "",
+    "OUTPUT RULES:",
+    "- Kembalikan 3 blok: FINAL_IMAGE_PROMPT_A, FINAL_IMAGE_PROMPT_B, FINAL_VIDEO_PROMPT",
+    "- Format plain text, tanpa markdown.",
+    "",
+  ].join("\n");
 }
 
 export default function CanvasHelperPage() {
@@ -174,13 +235,26 @@ export default function CanvasHelperPage() {
     }
   }
 
-  function onOpenAIStudio() {
-    window.open("https://aistudio.google.com/app/prompts/new_chat", "_blank", "noopener,noreferrer");
+  async function onCopyScenePack() {
+    if (!active) return;
+    try {
+      const pack = buildScenePack(active, activeIndex + 1);
+      await copyText(pack);
+      setMsg(`COPIED: SCENE PACK #${activeIndex + 1} ✅`);
+    } catch {
+      setMsg(`COPY_FAILED: SCENE PACK #${activeIndex + 1}`);
+    }
   }
 
-  async function onCopyBulk18AndOpenAIStudio() {
-    await onCopyBulk18();
-    onOpenAIStudio();
+  async function onCopyChatPrompt() {
+    if (!active) return;
+    try {
+      const p = buildChatPrompt(active, activeIndex + 1, meta);
+      await copyText(p);
+      setMsg(`COPIED: CHAT PROMPT #${activeIndex + 1} ✅`);
+    } catch {
+      setMsg(`COPY_FAILED: CHAT PROMPT #${activeIndex + 1}`);
+    }
   }
 
   function onBackBuilder() {
@@ -213,18 +287,15 @@ export default function CanvasHelperPage() {
           <button className="btn ghost" type="button" onClick={onBackPanels}>
             ← PANELS
           </button>
+
           <button className="btn" type="button" onClick={onCopyBulk18} disabled={!mounted || !scenes.length}>
             COPY BULK 18
           </button>
-          <button className="btn" type="button" onClick={onCopyBulk18AndOpenAIStudio} disabled={!mounted || !scenes.length}>
-            COPY + AI STUDIO
-          </button>
-          <button className="btn ghost" type="button" onClick={onOpenAIStudio}>
-            OPEN AI STUDIO
-          </button>
+
           <button className="btn ghost" type="button" onClick={loadFromStorage}>
             REFRESH
           </button>
+
           <Link className="settingsBtn" href="/settings">
             SETTINGS
           </Link>
@@ -235,7 +306,7 @@ export default function CanvasHelperPage() {
         <div className="card hero">
           <div className="heroLeft">
             <div className="vibesLogo">Vibes Canvas</div>
-            <div className="vibesSlogan">Helper untuk copy prompt + buka AI Studio (ngikut UI Builder/Panels).</div>
+            <div className="vibesSlogan">Helper internal untuk copy/compose prompt (tanpa auto-open AI Studio).</div>
           </div>
 
           <div className="heroRight">
@@ -248,7 +319,7 @@ export default function CanvasHelperPage() {
           <aside className="card left">
             <div className="sectionHead">
               <div className="label cyan">SCENES</div>
-              <div className="smallMuted">{hasData ? "Klik scene untuk buka prompt." : "Belum ada data."}</div>
+              <div className="smallMuted">{hasData ? "Klik scene untuk buka helper." : "Belum ada data."}</div>
             </div>
 
             {!scenes.length ? (
@@ -292,7 +363,7 @@ export default function CanvasHelperPage() {
             <div className="hint">
               <div className="hintTitle">Tips</div>
               <div className="hintText">
-                - Ini helper untuk copy prompt + buka AI Studio.
+                - Canvas ini helper internal: copy prompt siap tempel ke mana pun.
                 <br />- Kalau kosong, balik ke Panels lalu generate 9 panel.
               </div>
             </div>
@@ -300,14 +371,14 @@ export default function CanvasHelperPage() {
 
           <main className="card right">
             <div className="sectionHead">
-              <div className="label pink">CANVAS</div>
+              <div className="label pink">HELPER</div>
               <div className="smallMuted">{active ? `SCENE #${activeIndex + 1}` : "Pilih scene di kiri."}</div>
             </div>
 
             {!active ? (
               <div className="canvasEmpty">
                 <div className="emptyTitle">Pilih scene di kiri.</div>
-                <div className="emptySub">Nanti prompt A/B + video + narrative muncul di sini.</div>
+                <div className="emptySub">Nanti helper pack & chat prompt muncul di sini.</div>
               </div>
             ) : (
               <div className="canvas">
@@ -318,11 +389,11 @@ export default function CanvasHelperPage() {
                   </div>
 
                   <div className="canvasBtns">
-                    <button className="miniBtn" type="button" onClick={() => onCopy(active.narrative, `NARRATIVE #${activeIndex + 1}`)}>
-                      COPY NARRATIVE
+                    <button className="miniBtn" type="button" onClick={onCopyScenePack}>
+                      COPY SCENE PACK
                     </button>
-                    <button className="miniBtn" type="button" onClick={() => onCopy(active.videoPrompt, `VIDEO #${activeIndex + 1}`)}>
-                      COPY VIDEO
+                    <button className="miniBtn" type="button" onClick={onCopyChatPrompt}>
+                      COPY CHAT PROMPT
                     </button>
                   </div>
                 </div>
@@ -717,7 +788,6 @@ export default function CanvasHelperPage() {
           box-shadow: 0 10px 0 rgba(0,0,0,.35);
           overflow:hidden;
         }
-        .promptBox.wide{ }
         .promptTop{
           display:flex;
           align-items:center;
