@@ -155,579 +155,631 @@ export default function CanvasHelperPage() {
     }
   }, [savedAt]);
 
-  async function onCopy(value: string, label: string) {
+  async function onCopy(text: string, label: string) {
     try {
-      await copyText(value);
-      setMsg(`COPIED ✅ ${label}`);
+      await copyText(text);
+      setMsg(`COPIED: ${label} ✅`);
     } catch {
-      setMsg("COPY_FAILED: clipboard permission?");
+      setMsg(`COPY_FAILED: ${label}`);
     }
   }
 
   async function onCopyBulk18() {
-    if (!scenes.length) return setMsg("NO_SCENES: generate dulu");
     try {
-      await copyText(buildBulk18(scenes, meta || undefined));
-      setMsg("COPIED ✅ BULK 18");
+      const bulk = buildBulk18(scenes, meta || undefined);
+      await copyText(bulk);
+      setMsg("COPIED: BULK 18 ✅");
     } catch {
-      setMsg("COPY_FAILED: clipboard permission?");
+      setMsg("COPY_FAILED: BULK 18");
     }
   }
 
-  function onCopyBulk18AndOpenAIStudio() {
-    onCopyBulk18();
-    window.open("https://aistudio.google.com", "_blank", "noopener,noreferrer");
+  function onOpenAIStudio() {
+    window.open("https://aistudio.google.com/app/prompts/new_chat", "_blank", "noopener,noreferrer");
   }
 
-  function onBackPanels() {
-    window.location.href = "/builder/panels";
+  async function onCopyBulk18AndOpenAIStudio() {
+    await onCopyBulk18();
+    onOpenAIStudio();
   }
 
   function onBackBuilder() {
     window.location.href = "/builder";
   }
 
-  function onOpenAIStudio() {
-    window.open("https://aistudio.google.com", "_blank", "noopener,noreferrer");
+  function onBackPanels() {
+    window.location.href = "/builder/panels";
   }
 
-  function onOpenByScene(n: number) {
-    setActiveIndex(Math.max(0, Math.min(n, scenes.length - 1)));
+  function onOpenByScene(idx: number) {
+    setActiveIndex(Math.max(0, Math.min(idx, Math.max(0, scenes.length - 1))));
   }
+
+  const hasData = !!scenes.length;
 
   return (
     <div className="wrap">
-      <div className="topbar">
-        <div className="brand">
-          <div className="title">CANVAS HELPER</div>
-          <div className="tag">YOSOApps the Viral Creator</div>
+      <div className="topRow">
+        <div className="badgeRow">
+          <span className="pill ok">CANVAS</span>
+          <span className="pill">{hasData ? `SCENES: ${scenes.length}` : "SCENES: -"}</span>
+          <span className="pill">{`SAVED: ${savedAtLabel}`}</span>
         </div>
 
-        <div className="actions">
-          <button className="linkBtn" type="button" onClick={onBackBuilder}>
-            ← BACK TO IDE
+        <div className="rightBtns">
+          <button className="btn ghost" type="button" onClick={onBackBuilder}>
+            ← BACK IDE
           </button>
-          <button className="linkBtn" type="button" onClick={onBackPanels}>
-            ← BACK TO PANELS
+          <button className="btn ghost" type="button" onClick={onBackPanels}>
+            ← PANELS
           </button>
-
-          <button className="linkBtn" type="button" onClick={onCopyBulk18} disabled={!mounted || !scenes.length}>
+          <button className="btn" type="button" onClick={onCopyBulk18} disabled={!mounted || !scenes.length}>
             COPY BULK 18
           </button>
-
-          <button className="linkBtn" type="button" onClick={onCopyBulk18AndOpenAIStudio} disabled={!mounted || !scenes.length}>
-            COPY BULK 18 + OPEN AI STUDIO
+          <button className="btn" type="button" onClick={onCopyBulk18AndOpenAIStudio} disabled={!mounted || !scenes.length}>
+            COPY + AI STUDIO
           </button>
-
-          <button className="linkBtn" type="button" onClick={onOpenAIStudio}>
+          <button className="btn ghost" type="button" onClick={onOpenAIStudio}>
             OPEN AI STUDIO
           </button>
-
-          <button className="linkBtn" type="button" onClick={loadFromStorage}>
+          <button className="btn ghost" type="button" onClick={loadFromStorage}>
             REFRESH
           </button>
-
-          <Link className="linkBtn" href="/settings">
+          <Link className="settingsBtn" href="/settings">
             SETTINGS
           </Link>
         </div>
       </div>
 
-      <div className="metaCard">
-        <div className="metaRow">
-          <div className="metaTitle">META</div>
-          <div className="pill">{metaLine}</div>
-        </div>
-        <div className="metaRow">
-          <div className="metaTitle">SAVED AT</div>
-          <div className="pill">{savedAtLabel}</div>
-        </div>
-      </div>
-
-      <div className="grid">
-        <aside className="card left">
-          <div className="sectionTitle">SCENES</div>
-
-          {!scenes.length ? (
-            <div className="empty">
-              <div className="emptyTitle">Belum ada data.</div>
-              <div className="emptySub">
-                Generate 9 panel dulu di <span className="mono">/builder/panels</span> agar tersimpan ke{" "}
-                <span className="mono">YOSO_LAST_SCENES</span>.
-              </div>
-              <button className="bigBtn" type="button" onClick={onBackPanels}>
-                BUKA PANELS
-              </button>
-            </div>
-          ) : (
-            <div className="sceneList">
-              {scenes.map((s, idx) => {
-                const active = idx === activeIndex;
-                const hasAudio = !!s.audioBase64;
-                return (
-                  <button
-                    key={s.id || idx}
-                    type="button"
-                    className={`sceneItem ${active ? "active" : ""}`}
-                    onClick={() => onOpenByScene(idx)}
-                    title={`Open scene #${idx + 1}`}
-                  >
-                    <span className="sceneIndex">#{idx + 1}</span>
-                    <span className="sceneMini">
-                      {String(s.narrative || "").slice(0, 60) || "(empty narrative)"}
-                      {String(s.narrative || "").length > 60 ? "…" : ""}
-                    </span>
-                    <span className={`sceneBadge ${hasAudio ? "ok" : "bad"}`}>
-                      {hasAudio ? "AUDIO ✓" : "AUDIO -"}
-                    </span>
-                  </button>
-                );
-              })}
-            </div>
-          )}
-
-          <div className="hint">
-            <div className="hintTitle">Tips</div>
-            <div className="hintText">
-              - Ini hanya helper untuk copy prompt + buka AI Studio. <br />
-              - Kalau data kosong, balik ke Panels lalu generate 9 panel (dan audio kalau mau).
-            </div>
+      <div className="stage">
+        <div className="card hero">
+          <div className="heroLeft">
+            <div className="vibesLogo">Vibes Canvas</div>
+            <div className="vibesSlogan">Helper untuk copy prompt + buka AI Studio (ngikut UI Builder/Panels).</div>
           </div>
-        </aside>
 
-        <main className="card right">
-          <div className="sectionTitle">CANVAS</div>
+          <div className="heroRight">
+            <div className="metaLine">{metaLine}</div>
+            {msg ? <div className="msg">{msg}</div> : <div className="msg muted">Ready.</div>}
+          </div>
+        </div>
 
-          {!active ? (
-            <div className="canvasEmpty">
-              <div className="emptyTitle">Pilih scene di kiri.</div>
-              <div className="emptySub">Nanti prompt A/B + video + narrative muncul di sini.</div>
+        <div className="grid">
+          <aside className="card left">
+            <div className="sectionHead">
+              <div className="label cyan">SCENES</div>
+              <div className="smallMuted">{hasData ? "Klik scene untuk buka prompt." : "Belum ada data."}</div>
             </div>
-          ) : (
-            <div className="canvas">
-              <div className="canvasHead">
-                <div className="canvasLabel">
-                  <span className="badgePink">SCENE</span>
-                  <span className="bigIndex">#{activeIndex + 1}</span>
-                </div>
 
-                <div className="canvasBtns">
-                  <button className="miniBtn" type="button" onClick={() => onCopy(active.narrative, `NARRATIVE #${activeIndex + 1}`)}>
-                    COPY NARRATIVE
-                  </button>
-                  <button className="miniBtn" type="button" onClick={() => onCopy(active.videoPrompt, `VIDEO #${activeIndex + 1}`)}>
-                    COPY VIDEO
-                  </button>
+            {!scenes.length ? (
+              <div className="empty">
+                <div className="emptyTitle">Belum ada data.</div>
+                <div className="emptySub">
+                  Generate 9 panel dulu di <span className="mono">/builder/panels</span> supaya tersimpan ke{" "}
+                  <span className="mono">YOSO_LAST_SCENES</span>.
                 </div>
+                <button className="bigBtn" type="button" onClick={onBackPanels}>
+                  BUKA PANELS
+                </button>
               </div>
+            ) : (
+              <div className="sceneList">
+                {scenes.map((s, idx) => {
+                  const isActive = idx === activeIndex;
+                  const hasAudio = !!s.audioBase64;
+                  return (
+                    <button
+                      key={s.id || idx}
+                      type="button"
+                      className={`sceneItem ${isActive ? "active" : ""}`}
+                      onClick={() => onOpenByScene(idx)}
+                      title={`Open scene #${idx + 1}`}
+                    >
+                      <div className="sceneLeft">
+                        <span className="sceneIndex">#{idx + 1}</span>
+                        <span className="sceneMini">
+                          {String(s.narrative || "").slice(0, 60) || "(empty narrative)"}
+                          {String(s.narrative || "").length > 60 ? "…" : ""}
+                        </span>
+                      </div>
+                      <span className={`sceneBadge ${hasAudio ? "ok" : "bad"}`}>{hasAudio ? "AUDIO ✓" : "AUDIO -"}</span>
+                    </button>
+                  );
+                })}
+              </div>
+            )}
 
-              <div className="row2">
-                <div className="promptBox">
+            <div className="hint">
+              <div className="hintTitle">Tips</div>
+              <div className="hintText">
+                - Ini helper untuk copy prompt + buka AI Studio.
+                <br />- Kalau kosong, balik ke Panels lalu generate 9 panel.
+              </div>
+            </div>
+          </aside>
+
+          <main className="card right">
+            <div className="sectionHead">
+              <div className="label pink">CANVAS</div>
+              <div className="smallMuted">{active ? `SCENE #${activeIndex + 1}` : "Pilih scene di kiri."}</div>
+            </div>
+
+            {!active ? (
+              <div className="canvasEmpty">
+                <div className="emptyTitle">Pilih scene di kiri.</div>
+                <div className="emptySub">Nanti prompt A/B + video + narrative muncul di sini.</div>
+              </div>
+            ) : (
+              <div className="canvas">
+                <div className="canvasHead">
+                  <div className="canvasLabel">
+                    <span className="pill ok">SCENE</span>
+                    <span className="bigIndex">#{activeIndex + 1}</span>
+                  </div>
+
+                  <div className="canvasBtns">
+                    <button className="miniBtn" type="button" onClick={() => onCopy(active.narrative, `NARRATIVE #${activeIndex + 1}`)}>
+                      COPY NARRATIVE
+                    </button>
+                    <button className="miniBtn" type="button" onClick={() => onCopy(active.videoPrompt, `VIDEO #${activeIndex + 1}`)}>
+                      COPY VIDEO
+                    </button>
+                  </div>
+                </div>
+
+                <div className="row2">
+                  <div className="promptBox">
+                    <div className="promptTop">
+                      <div className="pTitle">
+                        <span className="badgeA">A</span> IMAGE PROMPT A
+                      </div>
+                      <button className="copyBtn" type="button" onClick={() => onCopy(active.imagePromptA, `PROMPT A #${activeIndex + 1}`)}>
+                        COPY
+                      </button>
+                    </div>
+                    <textarea className="area" value={active.imagePromptA} readOnly />
+                  </div>
+
+                  <div className="promptBox">
+                    <div className="promptTop">
+                      <div className="pTitle">
+                        <span className="badgeB">B</span> IMAGE PROMPT B
+                      </div>
+                      <button className="copyBtn" type="button" onClick={() => onCopy(active.imagePromptB, `PROMPT B #${activeIndex + 1}`)}>
+                        COPY
+                      </button>
+                    </div>
+                    <textarea className="area" value={active.imagePromptB} readOnly />
+                  </div>
+                </div>
+
+                <div className="promptBox wide">
                   <div className="promptTop">
                     <div className="pTitle">
-                      <span className="badgeA">A</span> IMAGE PROMPT A
+                      <span className="badgeV">V</span> VIDEO PROMPT
                     </div>
-                    <button className="copyBtn" type="button" onClick={() => onCopy(active.imagePromptA, `PROMPT A #${activeIndex + 1}`)}>
+                    <button className="copyBtn" type="button" onClick={() => onCopy(active.videoPrompt, `VIDEO #${activeIndex + 1}`)}>
                       COPY
                     </button>
                   </div>
-                  <textarea className="area" readOnly value={active.imagePromptA || ""} spellCheck={false} />
+                  <textarea className="area" value={active.videoPrompt} readOnly />
                 </div>
 
-                <div className="promptBox">
+                <div className="promptBox wide">
                   <div className="promptTop">
                     <div className="pTitle">
-                      <span className="badgeB">B</span> IMAGE PROMPT B
+                      <span className="badgeN">N</span> NARRATIVE
                     </div>
-                    <button className="copyBtn" type="button" onClick={() => onCopy(active.imagePromptB, `PROMPT B #${activeIndex + 1}`)}>
+                    <button className="copyBtn" type="button" onClick={() => onCopy(active.narrative, `NARRATIVE #${activeIndex + 1}`)}>
                       COPY
                     </button>
                   </div>
-                  <textarea className="area" readOnly value={active.imagePromptB || ""} spellCheck={false} />
+                  <textarea className="area" value={active.narrative} readOnly />
                 </div>
               </div>
-
-              <div className="wide">
-                <div className="promptTop">
-                  <div className="pTitle">
-                    <span className="badgeC">V</span> VIDEO PROMPT
-                  </div>
-                  <button className="copyBtn" type="button" onClick={() => onCopy(active.videoPrompt, `VIDEO #${activeIndex + 1}`)}>
-                    COPY
-                  </button>
-                </div>
-                <textarea className="area" readOnly value={active.videoPrompt || ""} spellCheck={false} />
-              </div>
-
-              <div className="wide">
-                <div className="promptTop">
-                  <div className="pTitle">
-                    <span className="badgeN">N</span> NARRATIVE
-                  </div>
-                  <button className="copyBtn" type="button" onClick={() => onCopy(active.narrative, `NARRATIVE #${activeIndex + 1}`)}>
-                    COPY
-                  </button>
-                </div>
-                <textarea className="area" readOnly value={active.narrative || ""} spellCheck={false} />
-              </div>
-
-              <div className="footerBtns">
-                <button className="bigBtn" type="button" onClick={onCopyBulk18} disabled={!mounted || !scenes.length}>
-                  COPY BULK 18 (ALL)
-                </button>
-                <button className="bigBtn alt" type="button" onClick={onCopyBulk18AndOpenAIStudio} disabled={!mounted || !scenes.length}>
-                  COPY BULK 18 + OPEN AI STUDIO
-                </button>
-              </div>
-            </div>
-          )}
-
-          <div className="debug">
-            <div className="debugTitle">Debug</div>
-            {msg ? <pre className="pre">{msg}</pre> : null}
-          </div>
-        </main>
+            )}
+          </main>
+        </div>
       </div>
 
       <style>{`
-        :global(html),
-        :global(body) { overflow-x: hidden; }
+        :global(html), :global(body){ margin:0; padding:0; }
+        :global(html), :global(body){ overflow-x:hidden; }
+
         .wrap{
-          min-height:100vh;
-          padding:18px;
+          min-height: 100vh;
           background: radial-gradient(1200px 800px at 20% 0%, #0b1b3a 0%, #060a14 60%, #050712 100%);
+          padding: 18px;
           font-family: ui-rounded, "Comic Sans MS", "Trebuchet MS", system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif;
+          color: #fff;
+          position: relative;
         }
 
-        .topbar{
-          background:#ffd84a;
-          border:4px solid #000;
-          border-radius:18px;
-          padding:14px 16px;
+        .topRow{
           display:flex;
           align-items:center;
           justify-content:space-between;
-          gap:12px;
-          box-shadow:0 16px 40px rgba(0,0,0,.35);
+          gap: 12px;
           flex-wrap:wrap;
+          margin-bottom: 12px;
         }
-        .brand{ color:#111; }
-        .title{ font-weight:1000; font-size:18px; letter-spacing:.3px; text-transform:uppercase; }
-        .tag{ font-size:12px; font-weight:900; opacity:.9; }
 
-        .actions{ display:flex; gap:10px; align-items:center; flex-wrap:wrap; justify-content:flex-end; }
-        .linkBtn{
-          text-decoration:none; color:#111; font-weight:1000; font-size:12px;
-          padding:10px 12px; border-radius:14px; border:3px solid #000;
-          background:#fff; box-shadow:0 6px 0 #000; cursor:pointer; text-transform:uppercase;
+        .badgeRow{
+          display:flex;
+          gap: 10px;
+          flex-wrap:wrap;
+          align-items:center;
         }
-        .linkBtn:active{ transform:translateY(2px); box-shadow:0 4px 0 #000; }
-        .linkBtn:disabled{ opacity:.65; cursor:not-allowed; }
 
-        .metaCard{
-          margin-top:14px;
-          background:#fff;
-          border:4px solid #000;
-          border-radius:18px;
-          padding:12px 14px;
-          box-shadow:0 16px 40px rgba(0,0,0,.35);
-          display:grid;
-          gap:10px;
-        }
-        .metaRow{ display:flex; gap:10px; align-items:center; flex-wrap:wrap; }
-        .metaTitle{ font-weight:1000; text-transform:uppercase; font-size:12px; color:#111; }
         .pill{
-          font-size:12px; font-weight:1000; padding:10px 12px; border-radius:999px;
-          border:3px solid #000; background:#f1f5f9; box-shadow:0 6px 0 #000; color:#111;
+          display:inline-flex;
+          align-items:center;
+          gap:8px;
+          padding: 8px 12px;
+          border: 3px solid #000;
+          background: rgba(255,255,255,0.10);
+          border-radius: 999px;
+          font-weight: 900;
+          font-size: 12px;
+          letter-spacing: .5px;
+          box-shadow: 0 6px 0 rgba(0,0,0,.35);
+          text-transform: uppercase;
+        }
+        .pill.ok{ background:#79ff86; color:#05120a; }
+
+        .rightBtns{
+          display:flex;
+          gap:10px;
+          flex-wrap:wrap;
+          justify-content:flex-end;
+          align-items:center;
         }
 
-        .grid{
-          display:grid;
-          grid-template-columns:360px 1fr;
-          gap:16px;
-          margin-top:16px;
-          align-items:start;
+        .btn{
+          background:#ffd84a;
+          border: 3px solid #000;
+          border-radius: 14px;
+          padding: 10px 12px;
+          font-weight: 1000;
+          cursor:pointer;
+          box-shadow: 0 7px 0 rgba(0,0,0,.35);
+          transition: transform .06s ease;
+          color:#111;
+          text-transform: uppercase;
+          font-size: 12px;
+          letter-spacing: .6px;
+        }
+        .btn:active{ transform: translateY(2px); box-shadow: 0 5px 0 rgba(0,0,0,.35); }
+        .btn:disabled{ opacity:.5; cursor:not-allowed; }
+        .btn.ghost{
+          background: rgba(255,255,255,0.10);
+          color:#fff;
+        }
+
+        .settingsBtn{
+          display:inline-flex;
+          align-items:center;
+          justify-content:center;
+          background:#00e0ff;
+          border: 3px solid #000;
+          border-radius: 14px;
+          padding: 10px 12px;
+          font-weight: 1000;
+          box-shadow: 0 7px 0 rgba(0,0,0,.35);
+          text-decoration:none;
+          color:#06131a;
+          text-transform: uppercase;
+          font-size: 12px;
+          letter-spacing: .6px;
+        }
+        .settingsBtn:active{ transform: translateY(2px); box-shadow: 0 5px 0 rgba(0,0,0,.35); }
+
+        .stage{
+          max-width: 1200px;
+          margin: 0 auto;
         }
 
         .card{
-          background:#fff;
-          border-radius:22px;
-          border:4px solid #000;
-          padding:16px;
-          box-shadow:0 18px 50px rgba(0,0,0,.35);
-          min-width:0;
+          border: 4px solid #000;
+          border-radius: 18px;
+          background: rgba(255,255,255,0.07);
+          box-shadow: 0 12px 0 rgba(0,0,0,.35);
         }
 
-        .sectionTitle{
-          font-weight:1000;
-          text-transform:uppercase;
-          font-size:16px;
-          margin-bottom:10px;
+        .hero{
+          display:flex;
+          gap: 14px;
+          padding: 14px;
+          align-items:stretch;
+          justify-content:space-between;
+          margin-bottom: 14px;
+          flex-wrap:wrap;
+        }
+        .heroLeft{ min-width: 240px; }
+        .heroRight{ display:flex; flex-direction:column; gap:8px; min-width: 260px; flex:1; align-items:flex-end; }
+        .vibesLogo{
+          font-weight: 1000;
+          font-size: 22px;
+          letter-spacing: .6px;
+          text-transform: uppercase;
+        }
+        .vibesSlogan{
+          opacity: .85;
+          margin-top: 6px;
+          font-weight: 800;
+          font-size: 12px;
+        }
+        .metaLine{
+          font-weight: 900;
+          font-size: 12px;
+          opacity: .9;
+          text-align:right;
+        }
+        .msg{
+          font-weight: 1000;
+          font-size: 12px;
+          padding: 8px 10px;
+          border: 3px solid #000;
+          border-radius: 14px;
+          background: rgba(0,0,0,.25);
+          max-width: 520px;
+          text-align:right;
+        }
+        .msg.muted{ opacity:.75; }
+
+        .grid{
+          display:grid;
+          grid-template-columns: 360px 1fr;
+          gap: 14px;
+        }
+        @media (max-width: 980px){
+          .grid{ grid-template-columns: 1fr; }
+          .heroRight{ align-items:flex-start; }
+          .metaLine, .msg{ text-align:left; }
+        }
+
+        .left, .right{ padding: 12px; }
+
+        .sectionHead{
+          display:flex;
+          align-items:flex-end;
+          justify-content:space-between;
+          gap:10px;
+          margin-bottom: 10px;
+          flex-wrap:wrap;
+        }
+
+        .label{
+          display:inline-flex;
+          align-items:center;
+          padding: 8px 12px;
+          border: 3px solid #000;
+          border-radius: 999px;
+          font-weight: 1000;
+          letter-spacing: .6px;
+          text-transform: uppercase;
+          box-shadow: 0 7px 0 rgba(0,0,0,.35);
+          font-size: 12px;
           color:#111;
+        }
+        .label.cyan{ background:#00e0ff; }
+        .label.pink{ background:#ff6bd6; }
+
+        .smallMuted{
+          font-size: 12px;
+          opacity: .8;
+          font-weight: 800;
         }
 
         .empty{
-          border:4px dashed #000;
-          border-radius:22px;
-          padding:16px;
-          background:#f1f5f9;
-          color:#111;
+          padding: 14px;
+          border: 3px dashed rgba(255,255,255,0.25);
+          border-radius: 14px;
+          background: rgba(0,0,0,.18);
         }
-        .emptyTitle{ font-weight:1000; text-transform:uppercase; margin-bottom:6px; }
-        .emptySub{ font-weight:900; font-size:12px; opacity:.85; line-height:1.45; }
+        .emptyTitle{ font-size: 16px; font-weight: 1000; }
+        .emptySub{ margin-top: 6px; opacity:.9; font-weight: 800; font-size: 12px; line-height: 1.35; }
         .mono{ font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace; }
 
-        .sceneList{ display:grid; gap:10px; }
-        .sceneItem{
-          width:100%;
-          display:grid;
-          grid-template-columns:72px 1fr 86px;
-          gap:10px;
-          align-items:center;
-          padding:10px 12px;
-          border:3px solid #000;
-          border-radius:18px;
-          background:#fff;
-          box-shadow:0 8px 0 #000;
+        .bigBtn{
+          margin-top: 10px;
+          width: 100%;
+          background:#79ff86;
+          border: 3px solid #000;
+          border-radius: 14px;
+          padding: 12px;
+          font-weight: 1000;
+          box-shadow: 0 7px 0 rgba(0,0,0,.35);
           cursor:pointer;
-          text-align:left;
+          text-transform: uppercase;
+          letter-spacing: .6px;
         }
-        .sceneItem:active{ transform:translateY(2px); box-shadow:0 6px 0 #000; }
-        .sceneItem.active{ background:#dcfce7; }
-        .sceneIndex{
-          display:inline-flex;
+        .bigBtn:active{ transform: translateY(2px); box-shadow: 0 5px 0 rgba(0,0,0,.35); }
+
+        .sceneList{
+          display:flex;
+          flex-direction:column;
+          gap: 10px;
+        }
+        .sceneItem{
+          display:flex;
           align-items:center;
-          justify-content:center;
-          border:3px solid #000;
-          border-radius:14px;
-          padding:8px 10px;
-          font-weight:1000;
-          background:#ff66c4;
-          box-shadow:0 6px 0 #000;
+          justify-content:space-between;
+          gap:10px;
+          width:100%;
+          text-align:left;
+          background: rgba(0,0,0,.22);
+          border: 3px solid #000;
+          border-radius: 14px;
+          padding: 10px;
+          color:#fff;
+          cursor:pointer;
+          box-shadow: 0 7px 0 rgba(0,0,0,.35);
+        }
+        .sceneItem:active{ transform: translateY(2px); box-shadow: 0 5px 0 rgba(0,0,0,.35); }
+        .sceneItem.active{ background: rgba(255,216,74,.18); }
+
+        .sceneLeft{ display:flex; align-items:center; gap: 10px; min-width: 0; }
+        .sceneIndex{
+          background:#ffd84a;
+          color:#111;
+          border: 3px solid #000;
+          border-radius: 12px;
+          padding: 6px 10px;
+          font-weight: 1000;
+          flex:0 0 auto;
         }
         .sceneMini{
-          font-weight:900;
-          font-size:12px;
-          color:#111;
-          opacity:.9;
-          word-break:break-word;
-          overflow-wrap:anywhere;
-        }
-        .sceneBadge{
-          display:inline-flex;
-          align-items:center;
-          justify-content:center;
-          border:3px solid #000;
-          border-radius:999px;
-          padding:8px 10px;
-          font-weight:1000;
-          font-size:11px;
-          box-shadow:0 6px 0 #000;
+          opacity:.95;
+          font-weight: 800;
+          font-size: 12px;
+          line-height: 1.25;
+          overflow:hidden;
           white-space:nowrap;
+          text-overflow:ellipsis;
+          max-width: 220px;
         }
-        .sceneBadge.ok{ background:#4adee5; }
-        .sceneBadge.bad{ background:#fee2e2; }
+        @media (max-width: 980px){
+          .sceneMini{ max-width: 100%; }
+        }
+
+        .sceneBadge{
+          border: 3px solid #000;
+          border-radius: 999px;
+          padding: 6px 10px;
+          font-weight: 1000;
+          font-size: 11px;
+          letter-spacing: .6px;
+          text-transform: uppercase;
+          flex:0 0 auto;
+          box-shadow: 0 6px 0 rgba(0,0,0,.35);
+        }
+        .sceneBadge.ok{ background:#79ff86; color:#05120a; }
+        .sceneBadge.bad{ background: rgba(255,255,255,0.15); color:#fff; }
 
         .hint{
-          margin-top:14px;
-          padding:12px;
-          border:3px solid #000;
-          border-radius:16px;
-          background:#f1f5f9;
+          margin-top: 12px;
+          padding-top: 12px;
+          border-top: 2px dashed rgba(255,255,255,0.18);
         }
-        .hintTitle{ font-weight:1000; text-transform:uppercase; font-size:12px; margin-bottom:6px; }
-        .hintText{ font-weight:900; font-size:12px; opacity:.85; line-height:1.5; }
+        .hintTitle{ font-weight: 1000; text-transform: uppercase; letter-spacing: .6px; font-size: 12px; }
+        .hintText{ margin-top: 6px; opacity:.85; font-weight: 800; font-size: 12px; line-height: 1.35; }
 
-        .canvas{ display:grid; gap:12px; }
+        .canvasEmpty{
+          padding: 14px;
+          border: 3px dashed rgba(255,255,255,0.25);
+          border-radius: 14px;
+          background: rgba(0,0,0,.18);
+        }
+
+        .canvas{ display:flex; flex-direction:column; gap: 12px; }
+
         .canvasHead{
           display:flex;
           align-items:center;
           justify-content:space-between;
-          gap:10px;
+          gap: 10px;
           flex-wrap:wrap;
         }
-        .canvasLabel{ display:flex; align-items:center; gap:10px; }
-        .badgePink{
-          display:inline-flex;
-          align-items:center;
-          justify-content:center;
-          padding:8px 10px;
-          border:3px solid #000;
-          border-radius:14px;
-          background:#ffd84a;
-          font-weight:1000;
-          box-shadow:0 6px 0 #000;
-          text-transform:uppercase;
-        }
-        .bigIndex{
-          display:inline-flex;
-          align-items:center;
-          justify-content:center;
-          padding:8px 12px;
-          border:3px solid #000;
-          border-radius:14px;
-          background:#ff66c4;
-          font-weight:1000;
-          box-shadow:0 6px 0 #000;
-        }
-        .canvasBtns{ display:flex; gap:10px; flex-wrap:wrap; }
+        .canvasLabel{ display:flex; align-items:center; gap: 10px; }
+        .bigIndex{ font-weight: 1000; font-size: 18px; }
+
+        .canvasBtns{ display:flex; gap: 10px; flex-wrap:wrap; }
+
         .miniBtn{
-          padding:10px 12px;
-          border:3px solid #000;
-          border-radius:14px;
-          background:#4adee5;
-          font-weight:1000;
-          box-shadow:0 6px 0 #000;
+          background: rgba(255,255,255,0.10);
+          color:#fff;
+          border: 3px solid #000;
+          border-radius: 14px;
+          padding: 10px 12px;
+          font-weight: 1000;
           cursor:pointer;
-          text-transform:uppercase;
-          font-size:12px;
+          box-shadow: 0 7px 0 rgba(0,0,0,.35);
+          text-transform: uppercase;
+          font-size: 12px;
+          letter-spacing: .6px;
         }
-        .miniBtn:active{ transform:translateY(2px); box-shadow:0 4px 0 #000; }
+        .miniBtn:active{ transform: translateY(2px); box-shadow: 0 5px 0 rgba(0,0,0,.35); }
 
         .row2{
           display:grid;
-          grid-template-columns:1fr 1fr;
-          gap:12px;
-          min-width:0;
+          grid-template-columns: 1fr 1fr;
+          gap: 12px;
+        }
+        @media (max-width: 980px){
+          .row2{ grid-template-columns: 1fr; }
         }
 
-        .promptBox, .wide{
-          border:4px solid #000;
-          border-radius:22px;
-          padding:10px;
-          background:#fff;
-          box-shadow:0 12px 0 rgba(0,0,0,.15);
-          min-width:0;
+        .promptBox{
+          border: 3px solid #000;
+          border-radius: 16px;
+          background: rgba(0,0,0,.22);
+          box-shadow: 0 10px 0 rgba(0,0,0,.35);
+          overflow:hidden;
         }
-
+        .promptBox.wide{ }
         .promptTop{
           display:flex;
           align-items:center;
           justify-content:space-between;
           gap:10px;
-          flex-wrap:wrap;
-          margin-bottom:8px;
+          padding: 10px;
+          border-bottom: 3px solid #000;
+          background: rgba(255,255,255,0.06);
         }
         .pTitle{
-          font-weight:1000;
-          text-transform:uppercase;
-          font-size:12px;
-          color:#111;
+          font-weight: 1000;
+          text-transform: uppercase;
+          letter-spacing: .6px;
+          font-size: 12px;
           display:flex;
           align-items:center;
-          gap:8px;
+          gap: 8px;
         }
-        .badgeA, .badgeB, .badgeC, .badgeN{
-          width:28px;
-          height:28px;
-          border-radius:12px;
-          border:3px solid #000;
+        .copyBtn{
+          background:#ffd84a;
+          border: 3px solid #000;
+          border-radius: 12px;
+          padding: 8px 10px;
+          font-weight: 1000;
+          cursor:pointer;
+          box-shadow: 0 7px 0 rgba(0,0,0,.35);
+          text-transform: uppercase;
+          font-size: 12px;
+          letter-spacing: .6px;
+        }
+        .copyBtn:active{ transform: translateY(2px); box-shadow: 0 5px 0 rgba(0,0,0,.35); }
+
+        .area{
+          width: 100%;
+          min-height: 180px;
+          background: rgba(0,0,0,.25);
+          color:#fff;
+          border: none;
+          outline: none;
+          padding: 10px;
+          font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+          font-size: 12px;
+          line-height: 1.4;
+          resize: vertical;
+        }
+
+        .badgeA, .badgeB, .badgeV, .badgeN{
           display:inline-flex;
           align-items:center;
           justify-content:center;
-          font-weight:1000;
-          box-shadow:0 6px 0 #000;
-        }
-        .badgeA{ background:#ff66c4; }
-        .badgeB{ background:#4adee5; }
-        .badgeC{ background:#ffd84a; }
-        .badgeN{ background:#dcfce7; }
-
-        .copyBtn{
-          padding:8px 10px;
-          border:3px solid #000;
-          border-radius:14px;
-          background:#fff;
-          font-weight:1000;
-          box-shadow:0 6px 0 #000;
-          cursor:pointer;
-          text-transform:uppercase;
-          font-size:12px;
-        }
-        .copyBtn:active{ transform:translateY(2px); box-shadow:0 4px 0 #000; }
-
-        .area{
-          width:100%;
-          height:160px;
-          resize:vertical;
-          border:0;
-          outline:none;
-          background:rgba(241,245,249,.9);
-          border-radius:16px;
-          padding:12px;
-          font-weight:900;
-          font-size:12px;
-          line-height:1.45;
+          width: 22px;
+          height: 22px;
+          border: 3px solid #000;
+          border-radius: 10px;
+          font-weight: 1000;
           color:#111;
-          box-shadow:inset 0 0 0 3px #000;
-          white-space:pre-wrap;
-          word-break:break-word;
-          overflow-wrap:anywhere;
+          box-shadow: 0 6px 0 rgba(0,0,0,.35);
         }
-
-        .footerBtns{
-          display:flex;
-          gap:12px;
-          flex-wrap:wrap;
-          margin-top:6px;
-        }
-
-        .bigBtn{
-          width:auto;
-          padding:14px 14px;
-          border:4px solid #000;
-          border-radius:20px;
-          background:#ffd84a;
-          font-weight:1000;
-          font-size:14px;
-          text-transform:uppercase;
-          cursor:pointer;
-          box-shadow:0 10px 0 #000;
-        }
-        .bigBtn:active{ transform:translateY(3px); box-shadow:0 7px 0 #000; }
-        .bigBtn:disabled{ opacity:.65; cursor:not-allowed; }
-        .bigBtn.alt{ background:#4adee5; }
-
-        .canvasEmpty{
-          border:4px dashed #000;
-          border-radius:22px;
-          padding:16px;
-          background:#f1f5f9;
-          color:#111;
-        }
-
-        .debug{
-          margin-top:16px;
-          padding-top:14px;
-          border-top:3px dashed rgba(0,0,0,.25);
-        }
-        .debugTitle{
-          font-weight:1000;
-          text-transform:uppercase;
-          font-size:13px;
-          margin-bottom:8px;
-          color:#111;
-        }
-        .pre{
-          margin-top:10px;
-          padding:12px;
-          border-radius:16px;
-          border:3px solid #000;
-          background:#fff;
-          font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
-          font-size:11px;
-          white-space:pre-wrap;
-          word-break:break-word;
-          overflow-wrap:anywhere;
-          max-width:100%;
-          overflow:hidden;
-          color:#111;
-        }
-
-        @media (max-width: 980px){
-          .grid{ grid-template-columns:1fr; }
-          .row2{ grid-template-columns:1fr; }
-        }
+        .badgeA{ background:#79ff86; }
+        .badgeB{ background:#ff6bd6; }
+        .badgeV{ background:#00e0ff; }
+        .badgeN{ background:#ffd84a; }
       `}</style>
     </div>
   );
