@@ -198,9 +198,10 @@ export const generateSceneImage = async (prompt: string, style: VideoStyle, aspe
   }));
 
   for (const part of response.candidates?.[0]?.content?.parts || []) {
-    if (part.inlineData) return part.inlineData.data;
-  }
-  throw new Error("Gagal generate gambar.");
+  const data = part?.inlineData?.data;
+  if (typeof data === "string" && data.length > 0) return data;
+}
+throw new Error("Gagal generate gambar.");
 };
 
 export const generateVoiceover = async (text: string): Promise<string | null> => {
