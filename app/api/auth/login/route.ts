@@ -1,20 +1,21 @@
-import { NextResponse } from "next/server"
-import { LICENSES } from "@/app/lib/licenses"
+import { NextResponse } from "next/server";
 
 export async function POST(req: Request) {
-  const { email, license, device } = await req.json()
+  const body = await req.json().catch(() => ({} as any));
 
-  const data = LICENSES.get(license)
+  const license = String(body.license ?? "").trim();
+  const email = String(body.email ?? "").trim();
+  const device_id = String(body.device_id ?? body.device ?? body.deviceId ?? "").trim();
 
-  if (!data || !data.active || data.email !== email) {
-    return NextResponse.json({ ok: false }, { status: 401 })
-  }
+  const base = new URL(req.url).origin;
 
-  if (!data.device) {
-    data.device = device
-  } else if (data.device !== device) {
-    return NextResponse.json({ ok: false }, { status: 403 })
-  }
+  const r = await fetch(`${base}/api/login`, {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ license, email, device_id }),
+    cache: "no-store",
+  });
 
-  return NextResponse.json({ ok: true })
+  const j = await r.json().catch(() => ({} as any));
+  return NextResponse.json(j, { status: r.status });
 }
