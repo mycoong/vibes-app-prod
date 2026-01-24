@@ -731,9 +731,10 @@ export default function AppClient() {
             <Link className="btn" href="/settings">
               SETTINGS
             </Link>
-            <button className="btn" type="button" onClick={() => window.open("https://aistudio.google.com/", "_blank")}>
-              CANVAS HELPER
+            <button className="btn" type="button" onClick={() => (window.location.href = "/canvas")}>
+            CANVAS HELPER
             </button>
+
 
             <button className="btn" type="button" onClick={onDownloadAudioOnly} disabled={!mounted || !scenes.length}>
               DOWNLOAD AUDIO ONLY
