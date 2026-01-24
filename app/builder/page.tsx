@@ -271,21 +271,76 @@ export default function BuilderIdeaPage() {
     setMsg("REF_IMAGE_CLEARED");
   }
 
-  function onBuild() {
-    if (!mounted) return;
-    const t = String(topic || "").trim();
-    if (!t) {
-      setMsg("TOPIC_EMPTY → isi kisah dulu");
-      return;
-    }
-    persistMeta({ ...meta, topic: t });
-    setIsBuilding(true);
-    setMsg("");
-    window.setTimeout(() => {
-      window.location.href = "/builder/panels";
-    }, 450);
+  async function onBuild() {
+  if (!mounted) return;
+
+  const t = String(topic || "").trim();
+  if (!t) {
+    setMsg("TOPIC_EMPTY → isi kisah dulu");
+    return;
   }
 
+  setMsg("");
+  setIsBuilding(true);
+
+  try {
+    const apiKeys = getAllApiKeysFromStorage();
+    setApiCount(apiKeys.length);
+    if (!apiKeys.length) {
+      setMsg("API_KEY_MISSING → buka Settings, isi dulu 1-5 API key");
+      setIsBuilding(false);
+      return;
+    }
+
+    const payload = {
+      topic: t,
+      style,
+      format,
+      audience: "LOCAL",
+      genre: "DRAMA",
+      template: "VIRAL_DRAMA",
+      apiKeys,
+    };
+
+    // simpan meta biar konsisten
+    persistMeta({
+      topic: t,
+      style,
+      format,
+      audience: "LOCAL",
+      genre: "DRAMA",
+      template: "VIRAL_DRAMA",
+      refImageDataUrl: refImage ? "[HAS_REF_IMAGE]" : "",
+    });
+
+    const r = await fetch("/api/yoso/diorama/script", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify(payload),
+      cache: "no-store",
+    });
+
+    const j = await r.json().catch(() => null);
+
+    if (!r.ok || !j?.ok || !Array.isArray(j?.scenes) || j.scenes.length !== 9) {
+      const err = String(j?.error || `HTTP_${r.status}`);
+      setMsg(`GEN_FAILED: ${err}`);
+      setIsBuilding(false);
+      return;
+    }
+
+    // ini yang dibaca oleh /builder/panels
+    localStorage.setItem(
+      "YOSO_LAST_SCENES",
+      JSON.stringify({ scenes: j.scenes, meta: j.meta || payload, savedAt: Date.now() })
+    );
+
+    window.location.href = "/builder/panels";
+  } catch (e: any) {
+    setMsg(`GEN_FAILED: ${String(e?.message || e)}`);
+    setIsBuilding(false);
+  }
+}
   return (
     <div className="wrap">
       <div className="topRow">
