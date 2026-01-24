@@ -344,16 +344,28 @@ export default function BuilderIdeaPage() {
   return (
     <div className="wrap">
       <div className="topRow">
-        <div className="badgeRow">
-          <div className={`pill ${mounted && apiCount ? "ok" : "bad"}`}>
-            {mounted ? (apiCount ? `${apiCount} API Keys Loaded` : "API Keys Missing") : "Loading..."}
-          </div>
-          {refImage ? <div className="pill ok">REF IMAGE: ON</div> : <div className="pill">REF IMAGE: OFF</div>}
-        </div>
-        <button className="settingsBtn" type="button" onClick={() => (window.location.href = "/settings")}>
-          ⚙️ SETTINGS
-        </button>
-      </div>
+  <div className="badgeRow">
+    <div className={`pill ${mounted && apiCount ? "ok" : "bad"}`}>
+      {mounted ? (apiCount ? `${apiCount} API Keys Loaded` : "API Keys Missing") : "Loading..."}
+    </div>
+    {refImage ? <div className="pill ok">REF IMAGE: ON</div> : <div className="pill">REF IMAGE: OFF</div>}
+  </div>
+
+  <div className="topActions">
+    <button
+      className="settingsBtn"
+      type="button"
+      onClick={() => window.open("/whisk", "whisk_login", "width=760,height=760,noopener,noreferrer")}
+    >
+      🧪 LOGIN WHISK
+    </button>
+
+    <button className="settingsBtn" type="button" onClick={() => (window.location.href = "/settings")}>
+      ⚙️ SETTINGS
+    </button>
+  </div>
+</div>
+
 
       <div className="stage">
         <div className="card">
@@ -785,6 +797,12 @@ export default function BuilderIdeaPage() {
           .refBox{ min-height: 140px; }
           .txt{ font-size: 12px; }
         }
+          .topActions{
+  display:flex;
+  gap:10px;
+  align-items:center;
+}
+
       `}</style>
     </div>
   );
