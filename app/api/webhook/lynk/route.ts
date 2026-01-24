@@ -1,69 +1,81 @@
-import { NextResponse } from "next/server"
-import { sendLicenseEmail } from "@/app/lib/mailer"
+import { NextResponse } from "next/server";
 
-const GSHEET_URL =
-  "https://script.google.com/macros/s/AKfycbwhiHe8Ic3kXNzdeUtoxx8MFz7Dp9bZJTrNL1qXAQ_qp3E8fAp3-5zjT6_jrXTuMrkYQQ/exec"
+export const runtime = "nodejs";
+
+function clean(v: any) {
+  return String(v ?? "").trim();
+}
 
 export async function POST(req: Request) {
   try {
-    const body = await req.json()
-
-    // 1) cek secret
-    if (body.secret !== process.env.LYNK_WEBHOOK_SECRET) {
+    const LICENSE_API_URL = clean(process.env.LICENSE_API_URL);
+    if (!LICENSE_API_URL) {
       return NextResponse.json(
-        { ok: false, error: "BAD_SECRET" },
-        { status: 401 }
-      )
+        { ok: false, error: "LICENSE_API_URL_NOT_SET" },
+        { status: 500 }
+      );
     }
 
-    const license =
-      "LIC-" + Math.random().toString(36).substring(2, 8).toUpperCase()
+    const body = await req.json().catch(() => ({} as any));
 
-    // 2) kirim ke Google Sheet
-    const sheetRes = await fetch(GSHEET_URL, {
+    // Lynk payload biasanya punya email + order_id + amount.
+    // Kita forward apa adanya biar GAS yang handle issuance + email + logging.
+    const email =
+      clean(body.email) ||
+      clean(body.customer_email) ||
+      clean(body.customer?.email);
+
+    const order_id =
+      clean(body.order_id) ||
+      clean(body.orderId) ||
+      clean(body.invoice_id) ||
+      clean(body.invoiceId) ||
+      clean(body.transaction_id) ||
+      clean(body.transactionId);
+
+    const amount =
+      clean(body.amount) ||
+      clean(body.total) ||
+      clean(body.price) ||
+      clean(body.gross_amount) ||
+      clean(body.grossAmount);
+
+    const source = "lynk_webhook";
+
+    // GAS v2: kamu bisa pakai action=issue atau action=simulate_lynk (tergantung implementasi kamu).
+    // Kita default ke issue; kalau GAS kamu maunya simulate_lynk, tinggal ganti 1 baris.
+    const url = new URL(LICENSE_API_URL);
+    url.searchParams.set("action", "issue");
+
+    const upstream = await fetch(url.toString(), {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: { "content-type": "application/json" },
       body: JSON.stringify({
-        email: body.email,
-        license,
-        source: "lynk"
-      })
-    })
+        email,
+        order_id,
+        amount,
+        source,
+        payload_json: JSON.stringify(body),
+      }),
+      cache: "no-store",
+    });
 
-    const sheetText = await sheetRes.text()
-
-    if (!sheetRes.ok) {
-      return NextResponse.json({
-        ok: false,
-        step: "sheet",
-        status: sheetRes.status,
-        response: sheetText
-      })
-    }
-
-    // 3) kirim email
+    const text = await upstream.text();
+    let data: any = null;
     try {
-      await sendLicenseEmail(body.email, license)
-    } catch (mailErr: any) {
-      return NextResponse.json({
-        ok: false,
-        step: "email",
-        error: mailErr?.message || "EMAIL_FAILED"
-      })
+      data = JSON.parse(text);
+    } catch {
+      data = { ok: false, error: "UPSTREAM_NOT_JSON", upstream_text: text.slice(0, 1000) };
     }
 
-    // 4) sukses
-    return NextResponse.json({
-      ok: true,
-      license,
-      sheet: sheetText
-    })
-
-  } catch (err: any) {
-    return NextResponse.json({
-      ok: false,
-      step: "unknown",
-      error: err?.message || String(err)
-    })
+    return NextResponse.json(
+      data,
+      { status: upstream.ok ? 200 : upstream.status || 400 }
+    );
+  } catch (e: any) {
+    return NextResponse.json(
+      { ok: false, error: String(e?.message || e) },
+      { status: 500 }
+    );
   }
 }
