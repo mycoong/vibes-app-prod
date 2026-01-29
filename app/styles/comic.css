@@ -1,0 +1,95 @@
+
+/* Comic UI Overlay - UI ONLY (no logic changes) */
+:root {
+  --pink: #ff6fb7;
+  --cyan: #38e1ff;
+  --yellow: #ffe04d;
+  --paper: #fdfdfd;
+  --ink: #000;
+}
+
+body {
+  background: radial-gradient(circle at top, #0c1326, #05080f 70%);
+}
+
+/* Panel Card */
+.comic-card {
+  background: var(--paper);
+  border: 4px solid var(--ink);
+  border-radius: 26px;
+  padding: 16px;
+  margin: 18px auto;
+  max-width: 440px;
+  box-shadow: 0 10px 0 #000;
+  position: relative;
+}
+
+/* Halftone effect */
+.comic-card::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background-image: radial-gradient(#0001 1px, transparent 1px);
+  background-size: 6px 6px;
+  border-radius: 22px;
+  pointer-events: none;
+}
+
+/* Badge */
+.comic-badge {
+  background: var(--pink);
+  border: 3px solid #000;
+  border-radius: 14px;
+  padding: 6px 12px;
+  font-weight: 900;
+  display: inline-block;
+}
+
+/* Image preview */
+.comic-img {
+  background: #0d1b2a;
+  border: 4px solid #000;
+  border-radius: 22px;
+  aspect-ratio: 3 / 4;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: bold;
+  color: #fff4;
+}
+
+/* Labels */
+.label-setup {
+  background: var(--pink);
+  border: 3px solid #000;
+  border-radius: 999px;
+  padding: 6px 14px;
+  font-weight: bold;
+}
+
+.label-klimaks {
+  background: var(--cyan);
+  border: 3px solid #000;
+  border-radius: 999px;
+  padding: 6px 14px;
+  font-weight: bold;
+}
+
+/* Narrative */
+.comic-narrative {
+  border: 4px solid #000;
+  border-radius: 20px;
+  padding: 14px;
+  margin-top: 12px;
+  font-style: italic;
+  font-size: 0.95rem;
+}
+
+/* Generate voice button */
+.btn-voice {
+  background: var(--cyan);
+  border: 3px solid #000;
+  border-radius: 999px;
+  padding: 6px 14px;
+  font-weight: 800;
+}

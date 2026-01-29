@@ -3,8 +3,6 @@ import React, { useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import JSZip from "jszip";
 
-
-
 type Scene = {
   id: string;
   narrative: string;
@@ -135,7 +133,11 @@ function downloadDataUrl(dataUrl: string, filename: string) {
   a.remove();
 }
 
-function downloadArrayBufferAsFile(ab: ArrayBuffer, filename: string, mime = "application/octet-stream") {
+function downloadArrayBufferAsFile(
+  ab: ArrayBuffer,
+  filename: string,
+  mime = "application/octet-stream"
+) {
   const blob = new Blob([ab], { type: mime });
   const url = URL.createObjectURL(blob);
   const a = document.createElement("a");
@@ -166,7 +168,10 @@ function isCTAPrompt(prompt: string): boolean {
   return cta.some((kw) => p.includes(kw));
 }
 
-function buildLockedPrompt(basePrompt: string, ref: WhiskRef | null): { prompt: string; referenceId: string } {
+function buildLockedPrompt(
+  basePrompt: string,
+  ref: WhiskRef | null
+): { prompt: string; referenceId: string } {
   const raw = String(basePrompt || "").trim();
   if (!raw) return { prompt: "", referenceId: "" };
   if (isCTAPrompt(raw)) return { prompt: raw, referenceId: "" };
@@ -187,13 +192,19 @@ function splitNarrative(narr: string): { a: string; b: string } {
   const t = String(narr || "").trim();
   if (!t) return { a: "", b: "" };
 
-  const paras = t.split(/\n\s*\n+/).map((x) => x.trim()).filter(Boolean);
+  const paras = t
+    .split(/\n\s*\n+/)
+    .map((x) => x.trim())
+    .filter(Boolean);
   if (paras.length >= 2) {
     const mid = Math.ceil(paras.length / 2);
     return { a: paras.slice(0, mid).join("\n\n"), b: paras.slice(mid).join("\n\n") };
   }
 
-  const sents = t.split(/(?<=[.!?])\s+/).map((x) => x.trim()).filter(Boolean);
+  const sents = t
+    .split(/(?<=[.!?])\s+/)
+    .map((x) => x.trim())
+    .filter(Boolean);
   if (sents.length >= 2) {
     const mid = Math.ceil(sents.length / 2);
     return { a: sents.slice(0, mid).join(" "), b: sents.slice(mid).join(" ") };
@@ -242,7 +253,12 @@ async function ensureCtxResumed(ctx: AudioContext) {
   }
 }
 
-async function pcm16ToAudioBuffer(bytes: Uint8Array, ctx: AudioContext, sampleRate = 24000, numChannels = 1) {
+async function pcm16ToAudioBuffer(
+  bytes: Uint8Array,
+  ctx: AudioContext,
+  sampleRate = 24000,
+  numChannels = 1
+) {
   const sampleCount = Math.floor(bytes.byteLength / 2);
   const dataInt16 = new Int16Array(bytes.buffer, bytes.byteOffset, sampleCount);
   const frameCount = Math.floor(dataInt16.length / numChannels);
@@ -715,37 +731,38 @@ export default function AppClient() {
     }
   }
 
-  // === UI RENDER (PART 2) ===
+  const [toolsOpen, setToolsOpen] = useState(false);
+
   return (
     <div className="wrap">
-      <div className="headerRow">
-        <div className="brandLeft">
-          <img className="brandLogo" src="/vibes-logo.png" alt="Vibes App" />
+      <div className="topbar">
+        <div className="brand">
+          <div className="brandIcon">◆</div>
+          <div className="brandText">
+            <div className="brandTitle">SCENE</div>
+            <div className="brandSub">VIBES APP • 9 PANEL</div>
+          </div>
         </div>
 
-        <div className="actionsRight">
-          <div className="btnRow">
-            <button className="btn" type="button" onClick={() => (window.location.href = "/builder")}>
-              ← BACK
-            </button>
-            <Link className="btn" href="/settings">
-              SETTINGS
-            </Link>
-            <button className="btn" type="button" onClick={() => (window.location.href = "/canvas")}>
-            CANVAS HELPER
-            </button>
+        <div className="topActions">
+          <button className="topBtn" type="button" onClick={() => (window.location.href = "/builder")}>
+            ←
+          </button>
+          <Link className="topBtn" href="/settings">
+            ⚙
+          </Link>
+          <button className="topBtn" type="button" onClick={() => (window.location.href = "/canvas")}>
+            ✦
+          </button>
+          <button className="topBtn wide" type="button" onClick={() => setToolsOpen((v) => !v)}>
+            TOOLS {toolsOpen ? "▲" : "▼"}
+          </button>
+        </div>
+      </div>
 
-
-            <button className="btn" type="button" onClick={onDownloadAudioOnly} disabled={!mounted || !scenes.length}>
-              DOWNLOAD AUDIO ONLY
-            </button>
-
-            <button className="btn" type="button" onClick={onDownloadAllAssets} disabled={!mounted || !scenes.length}>
-              DOWNLOAD ALL
-            </button>
-          </div>
-
-          <div className="pillRow">
+      {toolsOpen ? (
+        <div className="tools">
+          <div className="pills">
             <div className={`pill ${mounted && apiCount ? "ok" : "bad"}`}>
               {mounted ? (apiCount ? `${apiCount} API Keys Loaded` : "API Keys Missing") : "Loading..."}
             </div>
@@ -757,8 +774,17 @@ export default function AppClient() {
             </div>
             {msg ? <div className="pill msg">{msg}</div> : null}
           </div>
+
+          <div className="toolBtns">
+            <button className="toolBtn" type="button" onClick={onDownloadAudioOnly} disabled={!mounted || !scenes.length}>
+              DOWNLOAD AUDIO ONLY
+            </button>
+            <button className="toolBtn" type="button" onClick={onDownloadAllAssets} disabled={!mounted || !scenes.length}>
+              DOWNLOAD ALL
+            </button>
+          </div>
         </div>
-      </div>
+      ) : null}
 
       {!scenes.length ? (
         <div className="empty">
@@ -766,493 +792,500 @@ export default function AppClient() {
           <div className="emptySub">Balik ke IDE page untuk isi topik, lalu masuk Panels lagi.</div>
         </div>
       ) : (
-        <div className="panels">
+        <div className="list">
           {scenes.map((s, i) => {
             const idx = i + 1;
             const panelNum = String(idx).padStart(2, "0");
-            const narr = splitNarrative(s.narrative);
             const isThisPlaying = playingIndex === i;
             const showPause = isThisPlaying && !isPaused;
 
             return (
-              <div key={s.id || i} className="panelCard">
-                <div className="panelTop">
-                  <div className="panelNo">#{idx}</div>
-                  <div className="panelTitle">{meta.topic ? meta.topic.toUpperCase() : "PANELS"}</div>
+              <div key={s.id || i} className="card">
+                <div className="cardTop">
+                  <div className="badge">#{idx}</div>
+                  <button className="voiceBtn" type="button" onClick={() => onGenerateAudio(i)} disabled={!!s.audioLoading}>
+                    {s.audioLoading ? "🎤 WAIT..." : "🎤 GENERATE SUARA"}
+                  </button>
                 </div>
 
-                <div className="imgGrid">
+                <div className="imgRow">
                   <div className="imgCol">
-                    <div className="imgLabel a">A: SETUP</div>
+                    <div className="label pink">A: SETUP</div>
 
-                    <div className="imgFrame">
-                      {s.imageAError ? <div className="err">{s.imageAError}</div> : null}
+                    <button
+                      className="imgFrame"
+                      type="button"
+                      onClick={() => onGenerateWhiskImage(i, "A")}
+                      disabled={!!s.imageALoading}
+                      title="Tap untuk generate IMG A"
+                    >
+                      {s.imageALoading ? <div className="overlay">GENERATING...</div> : null}
+                      {s.imageAError ? <div className="errBox">{s.imageAError}</div> : null}
                       {s.imageADataUrl ? (
-                        <img className="preview" src={s.imageADataUrl} alt={`panel_${panelNum}_A`} />
+                        <img className="img" src={s.imageADataUrl} alt={`panel_${panelNum}_A`} />
                       ) : (
-                        <div className="ph">Preview A</div>
+                        <div className="ph">TAP TO GENERATE</div>
                       )}
-                    </div>
+                    </button>
 
-                    <div className="imgBtns">
+                    <div className="miniRow">
                       <button
-                        className="miniBtn primary"
-                        type="button"
-                        onClick={() => onGenerateWhiskImage(i, "A")}
-                        disabled={!!s.imageALoading}
-                        title="Generate image A"
-                      >
-                        <span className="btnTitle">{s.imageALoading ? "WAIT..." : "GENERATE"}</span>
-                        <span className="btnSub">IMG A</span>
-                      </button>
-
-                      <button
-                        className="miniBtn"
+                        className="mini"
                         type="button"
                         onClick={() => s.imageADataUrl && downloadDataUrl(s.imageADataUrl, `panel_${panelNum}_A.png`)}
                         disabled={!s.imageADataUrl}
-                        title="Download image A"
                       >
-                        <span className="btnTitle">DOWNLOAD</span>
-                        <span className="btnSub">IMG A</span>
+                        DOWNLOAD A
                       </button>
-
-                      <button className="miniBtn" type="button" onClick={() => onCopyPrompt(i, "A")} title="Copy prompt image A">
-                        <span className="btnTitle">COPY</span>
-                        <span className="btnSub">PROMPT A</span>
+                      <button className="mini" type="button" onClick={() => onCopyPrompt(i, "A")}>
+                        COPY PROMPT A
                       </button>
                     </div>
-
-                    <div className="narrBox">“{narr.a}”</div>
                   </div>
 
                   <div className="imgCol">
-                    <div className="imgLabel b">B: KLIMAKS</div>
+                    <div className="label cyan">B: KLIMAKS</div>
 
-                    <div className="imgFrame">
-                      {s.imageBError ? <div className="err">{s.imageBError}</div> : null}
+                    <button
+                      className="imgFrame"
+                      type="button"
+                      onClick={() => onGenerateWhiskImage(i, "B")}
+                      disabled={!!s.imageBLoading}
+                      title="Tap untuk generate IMG B"
+                    >
+                      {s.imageBLoading ? <div className="overlay">GENERATING...</div> : null}
+                      {s.imageBError ? <div className="errBox">{s.imageBError}</div> : null}
                       {s.imageBDataUrl ? (
-                        <img className="preview" src={s.imageBDataUrl} alt={`panel_${panelNum}_B`} />
+                        <img className="img" src={s.imageBDataUrl} alt={`panel_${panelNum}_B`} />
                       ) : (
-                        <div className="ph">Preview B</div>
+                        <div className="ph">TAP TO GENERATE</div>
                       )}
-                    </div>
+                    </button>
 
-                    <div className="imgBtns">
+                    <div className="miniRow">
                       <button
-                        className="miniBtn primary"
-                        type="button"
-                        onClick={() => onGenerateWhiskImage(i, "B")}
-                        disabled={!!s.imageBLoading}
-                        title="Generate image B"
-                      >
-                        <span className="btnTitle">{s.imageBLoading ? "WAIT..." : "GENERATE"}</span>
-                        <span className="btnSub">IMG B</span>
-                      </button>
-
-                      <button
-                        className="miniBtn"
+                        className="mini"
                         type="button"
                         onClick={() => s.imageBDataUrl && downloadDataUrl(s.imageBDataUrl, `panel_${panelNum}_B.png`)}
                         disabled={!s.imageBDataUrl}
-                        title="Download image B"
                       >
-                        <span className="btnTitle">DOWNLOAD</span>
-                        <span className="btnSub">IMG B</span>
+                        DOWNLOAD B
                       </button>
-
-                      <button className="miniBtn" type="button" onClick={() => onCopyPrompt(i, "B")} title="Copy prompt image B">
-                        <span className="btnTitle">COPY</span>
-                        <span className="btnSub">PROMPT B</span>
+                      <button className="mini" type="button" onClick={() => onCopyPrompt(i, "B")}>
+                        COPY PROMPT B
                       </button>
                     </div>
-
-                    <div className="narrBox">“{narr.b}”</div>
                   </div>
                 </div>
 
-                <div className="panelBottom">
-                  <div className="audioGroup">
-                    <button className="miniBtn wide" type="button" onClick={() => onGenerateAudio(i)} disabled={!!s.audioLoading}>
-                      <span className="btnTitle">{s.audioLoading ? "WAIT..." : "GENERATE"}</span>
-                      <span className="btnSub">SUARA / AUDIO</span>
-                    </button>
-
-                    <button className="miniBtn wide" type="button" onClick={() => onPlayOrPause(i)} disabled={!s.audioUrl}>
-                      <span className="btnTitle">{showPause ? "PAUSE" : "PLAY"}</span>
-                      <span className="btnSub">AUDIO</span>
-                    </button>
-
-                    <button
-                      className="miniBtn wide"
-                      type="button"
-                      onClick={async () => {
-                        if (!s.audioUrl) return;
-                        const wav = await fetchAudioAsWavArrayBuffer(s.audioUrl);
-                        downloadArrayBufferAsFile(wav, `panel_${panelNum}.wav`, "audio/wav");
-                        setMsg(`DOWNLOADED ✅ panel_${panelNum}.wav`);
-                      }}
-                      disabled={!s.audioUrl}
-                    >
-                      <span className="btnTitle">DOWNLOAD</span>
-                      <span className="btnSub">AUDIO</span>
-                    </button>
-
-                    <button className="miniBtn wide" type="button" onClick={() => onCopyVideoPrompt(i)} title="Copy video prompt">
-                      <span className="btnTitle">COPY</span>
-                      <span className="btnSub">PROMPT VIDEO</span>
-                    </button>
-                  </div>
-
-                  {s.audioError ? <div className="err inline">AUDIO: {s.audioError}</div> : null}
+                <div className="quote">
+                  “{String(s.narrative || "").trim() || "Narrative belum tersedia."}”
                 </div>
+
+                <div className="audioRow">
+                  <button className="mini wide" type="button" onClick={() => onPlayOrPause(i)} disabled={!s.audioUrl}>
+                    {showPause ? "PAUSE AUDIO" : "PLAY AUDIO"}
+                  </button>
+                  <button
+                    className="mini wide"
+                    type="button"
+                    onClick={async () => {
+                      if (!s.audioUrl) return;
+                      const wav = await fetchAudioAsWavArrayBuffer(s.audioUrl);
+                      downloadArrayBufferAsFile(wav, `panel_${panelNum}.wav`, "audio/wav");
+                      setMsg(`DOWNLOADED ✅ panel_${panelNum}.wav`);
+                    }}
+                    disabled={!s.audioUrl}
+                  >
+                    DOWNLOAD AUDIO
+                  </button>
                 </div>
+
+                <div className="videoRow">
+                  <button className="mini wide" type="button" onClick={() => onCopyVideoPrompt(i)}>
+                    COPY PROMPT VIDEO
+                  </button>
+                </div>
+
+                {s.audioError ? <div className="errInline">AUDIO: {s.audioError}</div> : null}
+              </div>
             );
           })}
         </div>
       )}
 
       <style>{`
+        :root{
+          --pink:#ff4fb7;
+          --cyan:#32d7ff;
+          --yellow:#ffe04d;
+          --paper:#fffdf8;
+          --ink:#000;
+        }
+
         .wrap{
           min-height:100vh;
-          background: #050712;
-          padding: 16px;
+          background:
+            radial-gradient(1200px 700px at 10% 0%, rgba(119, 71, 255, .25), transparent 60%),
+            radial-gradient(900px 600px at 90% 10%, rgba(51, 214, 255, .18), transparent 60%),
+            radial-gradient(1200px 900px at 50% 100%, rgba(255, 79, 183, .12), transparent 60%),
+            #050712;
+          padding: 12px;
           font-family: ui-rounded, system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif;
           color:#fff;
         }
 
-        /* HEADER (NO WHITE BANNER) */
-        .headerRow{
-          display:flex;
-          align-items:flex-start;
-          justify-content:space-between;
-          gap: 14px;
-          flex-wrap:wrap;
-          margin-bottom: 12px;
-        }
-
-        .brandLeft{
-          display:flex;
-          align-items:flex-start;
-        }
-
-        /* logo kiri, super gede */
-        .brandLogo{
-          height: 210px;
-          width:auto;
-          display:block;
-          filter: drop-shadow(0 14px 0 rgba(0,0,0,.35));
-        }
-
-        .actionsRight{
-          display:flex;
-          flex-direction:column;
-          gap: 10px;
-          align-items:flex-end;
-          flex: 1;
-          min-width: 320px;
-        }
-
-        .btnRow{
-          display:flex;
-          gap: 10px;
-          flex-wrap:wrap;
-          justify-content:flex-end;
-        }
-
-        .btn{
-          border:3px solid #000;
-          border-radius:16px;
+        .topbar{
+          background: var(--yellow);
+          color:#111;
+          border: 4px solid var(--ink);
+          border-radius: 22px;
+          box-shadow: 0 10px 0 #000;
           padding: 10px 12px;
-          background: rgba(255,255,255,.92);
-          font-weight:900;
-          cursor:pointer;
+          display:flex;
+          align-items:center;
+          justify-content:space-between;
+          gap: 10px;
+          max-width: 520px;
+          margin: 0 auto 14px auto;
+        }
+
+        .brand{
+          display:flex;
+          align-items:center;
+          gap: 10px;
+          min-width: 0;
+        }
+        .brandIcon{
+          width: 36px;
+          height: 36px;
+          background: var(--pink);
+          border: 3px solid #000;
+          border-radius: 12px;
+          display:flex;
+          align-items:center;
+          justify-content:center;
+          font-weight: 1000;
+          box-shadow: 0 6px 0 rgba(0,0,0,.2);
+          flex: 0 0 auto;
+        }
+        .brandText{ min-width: 0; }
+        .brandTitle{
+          font-weight: 1000;
+          letter-spacing: .4px;
+          font-size: 13px;
+          line-height: 1.1;
+          white-space: nowrap;
+          overflow: hidden;
+          text-overflow: ellipsis;
+        }
+        .brandSub{
+          font-weight: 900;
+          font-size: 10px;
+          opacity: .75;
+          margin-top: 2px;
+          letter-spacing: .3px;
+        }
+
+        .topActions{
+          display:flex;
+          gap: 8px;
+          align-items:center;
+          flex: 0 0 auto;
+        }
+        .topBtn{
+          border: 3px solid #000;
+          background: #fff;
+          border-radius: 14px;
+          padding: 8px 10px;
+          font-weight: 1000;
           box-shadow: 0 6px 0 #000;
+          cursor:pointer;
           text-decoration:none;
           color:#111;
-          text-transform:uppercase;
-          font-size:12px;
+          font-size: 12px;
         }
-        .btn:active{ transform: translateY(2px); box-shadow: 0 4px 0 #000; }
-        .btn:disabled{ opacity:.6; cursor:not-allowed; }
+        .topBtn:active{ transform: translateY(2px); box-shadow: 0 4px 0 #000; }
+        .topBtn.wide{ padding-left: 12px; padding-right: 12px; }
 
-        .pillRow{
+        .tools{
+          max-width: 520px;
+          margin: 0 auto 14px auto;
+          background: rgba(255,255,255,.92);
+          border: 4px solid #000;
+          border-radius: 22px;
+          box-shadow: 0 10px 0 rgba(0,0,0,.55);
+          padding: 10px;
+          color:#111;
+        }
+        .pills{
           display:flex;
-          gap: 10px;
           flex-wrap:wrap;
-          justify-content:flex-end;
-          align-items:center;
+          gap: 8px;
+          margin-bottom: 10px;
         }
         .pill{
-          border:3px solid #000;
-          border-radius:999px;
-          padding: 8px 10px;
-          background: rgba(255,255,255,.92);
-          font-weight:900;
-          box-shadow: 0 6px 0 rgba(0,0,0,.25);
-          font-size:12px;
-          text-transform:uppercase;
-          color:#111;
+          border: 3px solid #000;
+          border-radius: 999px;
+          padding: 7px 10px;
+          font-weight: 1000;
+          font-size: 11px;
+          text-transform: uppercase;
+          background: #fff;
+          box-shadow: 0 6px 0 rgba(0,0,0,.18);
         }
         .pill.ok{ background:#dcfce7; }
         .pill.bad{ background:#fee2e2; }
         .pill.msg{ background:#e0e7ff; }
 
+        .toolBtns{
+          display:flex;
+          gap: 8px;
+          flex-wrap: wrap;
+        }
+        .toolBtn{
+          border: 3px solid #000;
+          border-radius: 16px;
+          padding: 10px 12px;
+          background: #fff;
+          font-weight: 1000;
+          box-shadow: 0 6px 0 #000;
+          cursor:pointer;
+          text-transform: uppercase;
+          font-size: 12px;
+          flex: 1;
+          min-width: 180px;
+        }
+        .toolBtn:disabled{ opacity:.6; cursor:not-allowed; }
+        .toolBtn:active{ transform: translateY(2px); box-shadow: 0 4px 0 #000; }
+
         .empty{
-          margin-top: 14px;
+          max-width: 520px;
+          margin: 0 auto;
           background: rgba(255,255,255,.92);
-          border:6px solid #000;
-          border-radius:24px;
+          border: 6px solid #000;
+          border-radius: 26px;
           padding: 14px;
           box-shadow: 0 18px 50px rgba(0,0,0,.45);
-          max-width: 980px;
-          margin-left:auto;
-          margin-right:auto;
           color:#111;
         }
         .emptyTitle{ font-weight: 1000; }
-        .emptySub{ margin-top: 6px; font-weight: 800; opacity:.8; font-size: 12px; }
+        .emptySub{ margin-top: 6px; font-weight: 900; opacity:.8; font-size: 12px; }
 
-        .panels{
-          margin-top: 12px;
-          display:grid;
+        .list{
+          display:flex;
+          flex-direction:column;
           gap: 14px;
-          max-width: 1100px;
-          margin-left:auto;
-          margin-right:auto;
+          max-width: 520px;
+          margin: 0 auto;
         }
 
-        .panelCard{
-          background: rgba(255,255,255,.92);
-          border:7px solid #000;
-          border-radius:26px;
-          padding: 14px;
-          box-shadow: 0 18px 60px rgba(0,0,0,.55);
+        .card{
+          background: var(--paper);
           color:#111;
+          border: 5px solid #000;
+          border-radius: 28px;
+          padding: 14px;
+          box-shadow: 0 12px 0 #000;
+          position: relative;
+          overflow: hidden;
         }
+        /* halftone overlay */
+        .card::after{
+          content:"";
+          position:absolute;
+          inset:0;
+          background-image: radial-gradient(#0001 1px, transparent 1px);
+          background-size: 6px 6px;
+          pointer-events:none;
+          opacity: .8;
+        }
+        .card > *{ position:relative; z-index:1; }
 
-        .panelTop{
+        .cardTop{
           display:flex;
           align-items:center;
           justify-content:space-between;
           gap: 10px;
-          flex-wrap:wrap;
           margin-bottom: 10px;
         }
 
-        .panelNo{
-          width: 54px;
-          height: 54px;
-          border-radius:14px;
-          border:4px solid #000;
-          background:#f472b6;
-          display:flex;
-          align-items:center;
-          justify-content:center;
-          font-weight:1000;
-          box-shadow: 0 10px 0 rgba(0,0,0,.12);
-          font-size:18px;
+        .badge{
+          background: var(--pink);
+          border: 4px solid #000;
+          border-radius: 16px;
+          padding: 8px 12px;
+          font-weight: 1000;
+          box-shadow: 0 8px 0 rgba(0,0,0,.15);
+          font-size: 14px;
+          flex: 0 0 auto;
         }
 
-        .panelTitle{
-          flex:1;
-          min-width: 220px;
-          border:4px solid #000;
-          border-radius:18px;
-          padding: 12px 14px;
-          font-weight:1000;
-          box-shadow: 0 10px 0 rgba(0,0,0,.12);
-          background:#fff;
-          text-transform:uppercase;
-          letter-spacing:.3px;
-          text-align:center;
+        .voiceBtn{
+          background: var(--cyan);
+          border: 4px solid #000;
+          border-radius: 999px;
+          padding: 8px 12px;
+          font-weight: 1000;
+          box-shadow: 0 8px 0 rgba(0,0,0,.15);
+          cursor:pointer;
+          text-transform: uppercase;
+          font-size: 12px;
+          flex: 1;
         }
+        .voiceBtn:disabled{ opacity:.65; cursor:not-allowed; }
+        .voiceBtn:active{ transform: translateY(2px); box-shadow: 0 6px 0 rgba(0,0,0,.15); }
 
-        .imgGrid{
+        .imgRow{
           display:grid;
           grid-template-columns: 1fr 1fr;
-          gap: 14px;
-        }
-        @media (max-width: 980px){
-          .imgGrid{ grid-template-columns: 1fr; }
-          .brandLogo{ height: 150px; }
+          gap: 12px;
+          margin-top: 6px;
         }
 
         .imgCol{
-          border:4px solid #000;
-          border-radius:22px;
-          padding: 12px;
-          box-shadow: 0 12px 0 rgba(0,0,0,.12);
-          background:#fff;
+          display:flex;
+          flex-direction:column;
+          gap: 8px;
         }
 
-        .imgLabel{
-          border:4px solid #000;
-          border-radius:999px;
-          padding: 10px 12px;
-          font-weight:1000;
-          box-shadow: 0 10px 0 rgba(0,0,0,.12);
-          text-transform:uppercase;
-          font-size:12px;
+        .label{
           display:inline-block;
-          margin-bottom: 10px;
+          width: fit-content;
+          border: 3px solid #000;
+          border-radius: 999px;
+          padding: 7px 10px;
+          font-weight: 1000;
+          font-size: 11px;
+          text-transform: uppercase;
+          box-shadow: 0 6px 0 rgba(0,0,0,.12);
         }
-        .imgLabel.a{ background:#f472b6; }
-        .imgLabel.b{ background:#22c7c7; }
+        .label.pink{ background: var(--pink); }
+        .label.cyan{ background: var(--cyan); }
 
         .imgFrame{
-          border:4px solid #000;
-          border-radius:18px;
+          border: 4px solid #000;
+          border-radius: 22px;
+          background: #0b1220;
+          color: #fff;
+          aspect-ratio: 3 / 4;
           overflow:hidden;
-          background:#0b1220;
+          position: relative;
+          cursor:pointer;
+        }
+        .imgFrame:disabled{ cursor:not-allowed; opacity: .8; }
+        .imgFrame:active{ transform: translateY(1px); }
+
+        .img{
+          width:100%;
+          height:100%;
+          object-fit: cover;
+          display:block;
         }
 
         .ph{
-          height: 360px;
+          height:100%;
           display:flex;
           align-items:center;
           justify-content:center;
-          font-weight: 900;
-          opacity:.25;
-          color:#fff;
+          font-weight: 1000;
+          opacity:.35;
+          letter-spacing: .6px;
+          font-size: 11px;
         }
 
-        .preview{
-          width:100%;
-          height:auto;
-          display:block;
-          background:#000;
-        }
-
-        .imgBtns{
-          margin-top: 10px;
+        .overlay{
+          position:absolute;
+          inset:0;
+          background: rgba(0,0,0,.65);
           display:flex;
-          gap: 10px;
-          flex-wrap:wrap;
-          align-items:stretch;
+          align-items:center;
+          justify-content:center;
+          font-weight: 1000;
+          letter-spacing: .5px;
+          z-index: 3;
         }
 
-        .miniBtn{
-          border:3px solid #000;
-          border-radius:14px;
-          padding: 10px 12px;
+        .errBox{
+          position:absolute;
+          left:8px;
+          right:8px;
+          bottom:8px;
+          background:#fee2e2;
+          color:#111;
+          border: 3px solid #000;
+          border-radius: 14px;
+          padding: 8px 10px;
+          font-weight: 1000;
+          font-size: 11px;
+          z-index: 4;
+          white-space: pre-wrap;
+        }
+
+        .miniRow{
+          display:grid;
+          grid-template-columns: 1fr 1fr;
+          gap: 8px;
+        }
+
+        .mini{
+          border: 3px solid #000;
+          border-radius: 16px;
+          padding: 10px 10px;
           background:#fff;
           font-weight: 1000;
-          cursor:pointer;
           box-shadow: 0 6px 0 #000;
-          text-transform:uppercase;
-          font-size: 12px;
-          display:flex;
-          flex-direction:column;
-          align-items:center;
-          justify-content:center;
-          min-width: 120px;
+          cursor:pointer;
+          text-transform: uppercase;
+          font-size: 11px;
         }
-        .miniBtn:active{ transform: translateY(2px); box-shadow: 0 4px 0 #000; }
-        .miniBtn.primary{ background:#dcfce7; }
-        .miniBtn:disabled{ opacity:.65; cursor:not-allowed; }
+        .mini:disabled{ opacity:.65; cursor:not-allowed; }
+        .mini:active{ transform: translateY(2px); box-shadow: 0 4px 0 #000; }
+        .mini.wide{ width: 100%; }
 
-        .miniBtn.wide{
-          min-width: 160px;
-        }
-
-        .btnTitle{ font-size: 12px; line-height: 1.05; }
-        .btnSub{ font-size: 10px; line-height: 1.05; opacity:.75; margin-top: 2px; }
-
-        .narrBox{
+        .quote{
           margin-top: 12px;
-          border:4px solid #000;
-          border-radius:18px;
-          padding: 12px;
+          background: rgba(255,255,255,.92);
+          border: 4px solid #000;
+          border-radius: 22px;
+          padding: 12px 12px;
           font-weight: 900;
-          background:#fff;
-          box-shadow: 0 10px 0 rgba(0,0,0,.12);
-          white-space: pre-wrap;
-          line-height: 1.3;
           font-style: italic;
-        }
-
-        .panelBottom{
-          margin-top: 14px;
-          border-top:4px solid rgba(0,0,0,.15);
-          padding-top: 12px;
-        }
-
-        .audioGroup{
-          display:flex;
-          gap: 10px;
-          flex-wrap:wrap;
-          align-items:stretch;
-          justify-content:flex-start;
-        }
-
-        .err{
-          margin-top: 10px;
-          border:3px solid #000;
-          border-radius:14px;
-          padding: 8px 10px;
-          background:#fee2e2;
-          font-weight: 900;
-          font-size: 12px;
-          text-transform:uppercase;
+          line-height: 1.35;
+          box-shadow: 0 8px 0 rgba(0,0,0,.12);
           white-space: pre-wrap;
         }
-        .err.inline{ margin-top: 12px; }
 
-        /* =========================
-   MOBILE ONLY OVERRIDES
-   TIDAK SENTUH LOGIC
-========================= */
-@media (max-width: 900px) {
-  .grid,
-  .row2,
-  .imgRow,
-  .split {
-    grid-template-columns: 1fr !important;
-  }
+        .audioRow, .videoRow{
+          margin-top: 10px;
+          display:grid;
+          grid-template-columns: 1fr 1fr;
+          gap: 8px;
+        }
 
-  .panelCard {
-    padding: 12px !important;
-  }
+        .errInline{
+          margin-top: 10px;
+          background:#fee2e2;
+          color:#111;
+          border: 3px solid #000;
+          border-radius: 16px;
+          padding: 10px 10px;
+          font-weight: 1000;
+          font-size: 12px;
+          text-transform: uppercase;
+          box-shadow: 0 6px 0 rgba(0,0,0,.12);
+          white-space: pre-wrap;
+        }
 
-  .btnRow {
-    flex-direction: column !important;
-    gap: 8px !important;
-  }
-
-  .btn,
-  .miniBtn {
-    width: 100% !important;
-  }
-
-  textarea,
-  input {
-    font-size: 16px !important;
-  }
-}
-
-@media (max-width: 560px) {
-  .wrap {
-    padding: 10px !important;
-  }
-
-  .logo {
-    width: 140px !important;
-    height: auto !important;
-  }
-
-  .card {
-    border-width: 4px !important;
-  }
-
-  .pill {
-    font-size: 10px !important;
-    padding: 6px 10px !important;
-  }
-}
-
+        /* Mobile tuning */
+        @media (max-width: 520px){
+          .topbar, .tools, .list, .empty { max-width: 100%; }
+          .imgRow{ gap: 10px; }
+          .miniRow{ grid-template-columns: 1fr; }
+          .audioRow, .videoRow{ grid-template-columns: 1fr; }
+          .topBtn.wide{ display:none; }
+        }
       `}</style>
     </div>
   );
 }
-
