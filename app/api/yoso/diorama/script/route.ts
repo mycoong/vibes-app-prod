@@ -10,6 +10,9 @@ function json(data: any, status = 200) {
   });
 }
 
+/* =========================================================
+   Prompt builder (strict JSON contract)
+========================================================= */
 function buildPrompt(input: {
   topic: string;
   style: string;
@@ -21,12 +24,13 @@ function buildPrompt(input: {
   const { topic, style, format, audience, genre, template } = input;
 
   return `
-You are "YosoApp Fact Story Generator".
+You are "AI Studio Script Generator" for Vibes App (YosoApp internal).
 
-Return ONLY valid JSON. No markdown. No explanation.
+Return ONLY valid JSON. No markdown. No explanations. No code fences.
 
-JSON FORMAT:
+The JSON structure MUST be EXACTLY:
 {
+  "cta": "...",
   "scenes": [
     {
       "id": "scene-1",
@@ -39,93 +43,55 @@ JSON FORMAT:
   ]
 }
 
-================================================
-NARRATION RULES (VERY IMPORTANT)
-================================================
-Language: Indonesian
+ABSOLUTE RULES (NO EXCEPTIONS):
+- Total scenes MUST be exactly 9.
+- Every field must exist and be a non-empty string.
+- Do NOT include extra keys.
+- Do NOT use character names (NO "Budi", "Pak X", "si A", etc).
+- The 9 narratives MUST be ONE continuous story: scene-1 starts the story, scene-9 closes it.
+  Each scene continues the previous one (use connectors like "Lalu", "Di situ", "Sementara itu", "Akhirnya").
+  No standalone one-liners per scene.
+- Narrative language: Indonesian, tegas, bercerita, enak didengar (bukan puisi/pantun), anti-lebay, tidak puitis.
+- Narrative must feel like "fakta unik dikemas cerita", bukan dongeng.
+- Duration target for the WHOLE 9-scene narration: 35–50 seconds voiceover.
+  => Keep total length around 140–190 words Indonesian (approx), spread across 9 scenes naturally.
+- Hook is mandatory: scene-1 must open with a strong curiosity hook in 1–2 sentences.
+- Closing is mandatory: scene-9 must land the point (payoff) and naturally lead into CTA.
 
-Style:
-- Fakta nyata dikemas seperti storyteller edukatif
-- Mengalir seperti orang bercerita (bukan potongan kalimat kaku)
-- Tidak puitis
-- Tidak lebay
-- Tidak drama
-- Tidak sok misterius
-- Tidak seperti membaca artikel
-- Harus terdengar natural kalau dibacakan voice over
+CTA HARD RULES (HALUS, TANPA PART 2):
+- Output "cta" MUST be Indonesian.
+- CTA must be short (1–2 sentences), halus, natural, tegas, tidak lebay, tanpa emoji, tanpa "part 2".
+- Must include BOTH actions: FOLLOW and KOMEN.
+- Must relate to the story naturally (match the ending/punchline), not generic marketing.
+- Comment instruction should be context-based (e.g., ask opinion/keyword tied to story), not "lanjut/part 2".
+  Examples (do NOT copy verbatim):
+  - "Kalau kamu suka gaya cerita fakta seperti ini, follow. Menurutmu bagian paling bikin merinding yang mana? Tulis di komentar."
+  - "Follow biar kamu nggak ketinggalan cerita fakta berikutnya. Kalau kamu pernah dengar versi lain, tulis di komentar."
 
-Length:
-- Total 9 scene ≈ 150–190 kata total
-- Setara ±45–60 detik voice over
-- Scene tidak boleh terlalu pendek (min 14 kata rata-rata)
+IMAGE PROMPT STYLE (FOR GOOGLE WHISK / IMAGE MODEL):
+Goal: cinematic hyperreal scene that LOOKS like miniature via strong tilt-shift illusion,
+NOT a toy/figurine/model on a base.
 
-Structure:
-Scene 1: Hook fakta kuat, bikin penasaran
-Scene 2–8: Cerita faktual mengalir, edukatif, tetap ringan
-Scene 9: Penutup natural + CTA
+imagePromptA and imagePromptB must be ENGLISH and must:
+- Use square composition 1:1.
+- Force MEDIUM-WIDE or WIDE shot only (NO close-up portraits).
+- Force strong tilt-shift lens illusion (hard tilt-shift).
+- Look like real cinematic photography with atmospheric depth (volumetric light, haze, layered foreground/mid/background).
+- Realistic textures and imperfections: wood grain, stone, rust, moss, wet dirt, fabric weave, scratches, dust, water specular, etc.
+- Crowd of small-scale humans allowed, but they must look like real people photographed (not dolls).
+- NO toy look, NO plastic, NO CGI render look.
 
-CTA RULES:
-- Scene 1–8: TIDAK BOLEH ada kata follow, komen, komentar, part 2
-- Scene 9: WAJIB mengandung:
-  - kata "follow"
-  - kata "komen"
-  - kata "part 2"
-- CTA harus tetap natural, tidak maksa
-
-ABSOLUTE PROHIBITIONS:
-- Jangan bikin karakter fiktif (Budi, Andi, seorang pria, dll)
-- Jangan pakai gaya cerpen
-- Jangan buat dialog imajiner
-- Semua harus berbasis fakta
-
-================================================
-IMAGE PROMPT RULES (LOCKED STYLE)
-================================================
-imagePromptA dan imagePromptB harus bahasa Inggris.
-
-STYLE VISUAL (WAJIB):
-- Cinematic hyperreal miniature photography
-- Looks like real world captured with tilt-shift lens
-- Strong tilt-shift effect
-- Shallow depth of field
-- Ultra realistic textures
-- Cinematic lighting
-- Atmospheric realism
-- No CGI look
-- No illustration
-- No cartoon
-
-FRAMING:
-- Medium-wide or wide shot only
-- NO close-up portraits
-- NO extreme close framing
-- Must feel like observing a miniature world from distance
-
-FORMAT:
-- Composition optimized for Instagram square (1:1 aspect ratio)
-- Balanced center framing
-- Subject must fit naturally inside square crop
-
-STRICTLY FORBIDDEN WORDS:
-toy, plastic, figurine, doll, dollhouse, action figure,
-display base, stand, platform, support rod,
-CGI, render, illustration, cartoon, fake miniature
-
-PROMPT MUST EXPLICITLY INCLUDE:
-- "shot on tilt-shift lens"
-- "cinematic lighting"
-- "hyperreal miniature environment"
-- "square composition, 1:1 aspect ratio"
-- "no visible base, no support, no toy look"
+NEGATIVE (must be embedded in prompt):
+- MUST strongly ban: toy, figurine, doll, action figure, scale model, miniature model, diorama base, platform, stand, pedestal,
+  plastic sheen, CGI, render, 3D, cartoon, illustration, anime, game asset.
+- MUST ban "close-up", "macro product shot", "studio backdrop".
 
 VIDEO PROMPT:
-- English
-- 1–2 sentences
-- Must describe cinematic camera movement (slow dolly, pan, parallax, depth)
+- ENGLISH, 1–2 sentences.
+- Cinematic camera movement (push-in, crane, tracking).
+- Must match the same scene as image prompts, no close-up.
 
-================================================
-CONTEXT
-================================================
+Context:
 topic: ${topic}
 style: ${style}
 format: ${format}
@@ -133,15 +99,40 @@ audience: ${audience}
 genre: ${genre}
 template: ${template}
 
-Return JSON only.
+Now output JSON only.
 `.trim();
 }
 
+/* =========================================================
+   Helpers: strict validation
+========================================================= */
+function isNonEmptyString(v: any) {
+  return typeof v === "string" && v.trim().length > 0;
+}
+
+function isValidScene(s: any) {
+  return (
+    s &&
+    isNonEmptyString(s.id) &&
+    isNonEmptyString(s.narrative) &&
+    isNonEmptyString(s.imagePromptA) &&
+    isNonEmptyString(s.imagePromptB) &&
+    isNonEmptyString(s.videoPrompt)
+  );
+}
+
+/* =========================================================
+   Route
+========================================================= */
 export async function GET() {
-  return json({
-    ok: true,
-    message: "OK. Use POST with valid payload to generate scenes.",
-  });
+  return json(
+    {
+      ok: false,
+      error: "METHOD_NOT_ALLOWED",
+      message: "Use POST with JSON body: { topic, style, format, audience, genre, template, apiKeys[] }",
+    },
+    405
+  );
 }
 
 export async function POST(req: Request) {
@@ -170,48 +161,98 @@ export async function POST(req: Request) {
   }
 
   let keys: string[] = [];
+
   if (Array.isArray(body?.apiKeys)) {
     keys = body.apiKeys.map((k: any) => String(k || "").trim()).filter(Boolean);
   } else {
-    keys = [
-      body?.apiKey1,
-      body?.apiKey2,
-      body?.apiKey3,
-      body?.apiKey4,
-      body?.apiKey5,
-    ]
+    keys = [body?.apiKey1, body?.apiKey2, body?.apiKey3, body?.apiKey4, body?.apiKey5]
       .map((k: any) => String(k || "").trim())
       .filter(Boolean);
   }
 
   if (!keys.length) {
     return json(
-      { ok: false, error: "API_KEY_MISSING" },
+      {
+        ok: false,
+        error: "API_KEY_MISSING",
+        message: "apiKeys[] or apiKey1..apiKey5 must be provided",
+      },
       400
     );
   }
 
-  const prompt = buildPrompt({ topic, style, format, audience, genre, template });
+  const prompt = buildPrompt({
+    topic,
+    style,
+    format,
+    audience,
+    genre,
+    template,
+  });
 
-  const result = await callGeminiWithRotation({ keys, prompt });
+  const result = await callGeminiWithRotation({
+    keys,
+    prompt,
+  });
 
   if (!result.ok) {
-    return json({ ok: false, error: result.error, raw: result.raw }, 500);
+    return json(
+      {
+        ok: false,
+        error: result.error,
+        raw: result.raw,
+      },
+      500
+    );
   }
 
-  const data = result.json;
+  const jsonData = result.json;
 
-  if (!data || !Array.isArray(data.scenes)) {
-    return json({ ok: false, error: "INVALID_JSON", raw: data }, 500);
+  if (!jsonData || typeof jsonData !== "object") {
+    return json(
+      { ok: false, error: "JSON_INVALID", raw: result.text?.slice(0, 2000) },
+      500
+    );
   }
 
-  if (data.scenes.length !== 9) {
-    return json({ ok: false, error: "SCENE_COUNT_INVALID", count: data.scenes.length }, 500);
+  const cta = jsonData?.cta;
+  const scenes = jsonData?.scenes;
+
+  if (!isNonEmptyString(cta)) {
+    return json(
+      { ok: false, error: "CTA_MISSING_OR_INVALID", raw: jsonData },
+      500
+    );
+  }
+
+  if (!Array.isArray(scenes)) {
+    return json(
+      { ok: false, error: "SCENES_NOT_ARRAY", raw: jsonData },
+      500
+    );
+  }
+
+  if (scenes.length !== 9) {
+    return json(
+      { ok: false, error: "SCENES_COUNT_INVALID", count: scenes.length, raw: jsonData },
+      500
+    );
+  }
+
+  for (const [i, s] of scenes.entries()) {
+    if (!isValidScene(s)) {
+      return json(
+        { ok: false, error: "SCENE_FIELD_INVALID", index: i, raw: s },
+        500
+      );
+    }
   }
 
   return json({
     ok: true,
-    scenes: data.scenes,
+    cta,
+    scenes,
     meta: { topic, style, format, audience, genre, template },
+    usedKeyIndex: result.usedKeyIndex,
   });
 }
