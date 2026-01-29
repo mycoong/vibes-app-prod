@@ -60,6 +60,7 @@ export default function LoginClient() {
     }
   }
 
+
   return (
     <div className="wrap">
       <div className="card">
@@ -74,21 +75,23 @@ export default function LoginClient() {
             <input
               value={license}
               onChange={(e) => setLicense(e.target.value)}
-              placeholder="WW-XXXX-XXXX"
-              required
+              placeholder="ENTER YOUR LICENSE"
             />
           </div>
 
           <button disabled={loading}>
-            {loading ? "CHECKING..." : "LOGIN"}
+            {loading ? "PLEASE WAIT..." : "LOGIN"}
           </button>
 
-          <div className="device">
-            Device: <span>{maskedDevice || "..."}</span>
-          </div>
-
+          {device && <div className="device">DEVICE: {device}</div>}
           {err && <div className="error">ERROR: {err}</div>}
         </form>
+
+        <a href="https://t.me/VibesTheApp" target="_blank" className="telegram" aria-label="Telegram">
+          <svg viewBox="0 0 240 240" width="22" height="22" aria-hidden="true">
+            <path fill="currentColor" d="M120 0C53.7 0 0 53.7 0 120s53.7 120 120 120 120-53.7 120-120S186.3 0 120 0zm58.2 82.3l-22.4 105.6c-1.7 7.5-6.2 9.4-12.5 5.9l-34.6-25.5-16.7 16.1c-1.8 1.8-3.3 3.3-6.7 3.3l2.4-34.9 63.6-57.4c2.8-2.4-.6-3.7-4.3-1.3l-78.6 49.5-33.8-10.6c-7.3-2.3-7.5-7.3 1.5-10.8l132-50.9c6.1-2.2 11.4 1.5 9.4 11z"/>
+          </svg>
+        </a>
       </div>
 
       <style>{`
@@ -97,107 +100,75 @@ export default function LoginClient() {
           display: flex;
           align-items: center;
           justify-content: center;
-          background: radial-gradient(1200px 800px at 20% 0%, #0b1b3a 0%, #060a14 60%, #050712 100%);
-          padding: 20px;
-          font-family: ui-rounded, "Comic Sans MS", "Trebuchet MS", system-ui, sans-serif;
+          background-image: url('/login-bg.png');
+          background-size: cover;
+          background-position: center;
+          background-repeat: no-repeat;
+          position: relative;
+          overflow: hidden;
+          padding: 24px;
+          font-family: ui-rounded, "Trebuchet MS", system-ui, sans-serif;
+        }
+
+        .wrap::before {
+          content: "";
+          position: absolute;
+          inset: 0;
+          background: linear-gradient(180deg, rgba(0,0,0,.65), rgba(0,0,0,.75));
+          pointer-events: none;
         }
 
         .card {
-          background: #fff;
-          border: 4px solid #000;
-          border-radius: 26px;
-          padding: 26px;
           width: 100%;
-          max-width: 460px;
-          box-shadow: 0 20px 60px rgba(0,0,0,.45);
+          max-width: 440px;
+          background: rgba(8,10,22,.75);
+          border: 2px solid rgba(255,255,255,.08);
+          border-radius: 28px;
+          backdrop-filter: blur(10px);
+          box-shadow: 0 30px 80px rgba(0,0,0,.6);
+          padding: 28px;
           display: flex;
           flex-direction: column;
           gap: 22px;
+          position: relative;
         }
 
-        .brand {
-          text-align: center;
-        }
+        .brand { text-align: center; }
+        .logo { height: 110px; margin: 0 auto 6px; display: block; }
+        .slogan { font-weight: 900; font-size: 12px; letter-spacing: .14em; opacity: .8; text-transform: uppercase; }
 
-        .logo {
-          height: 140px;
-          margin: 0 auto 10px;
-          display: block;
-          filter: drop-shadow(0 10px 0 #000);
-        }
-
-        .slogan {
-          font-weight: 1000;
-          font-size: 13px;
-          letter-spacing: 0.12em;
-          opacity: 0.85;
-          text-transform: uppercase;
-        }
-
-        .form {
-          display: flex;
-          flex-direction: column;
-          gap: 16px;
-        }
-
-        .field {
-          display: flex;
-          flex-direction: column;
-          gap: 6px;
-        }
-
-        label {
-          font-weight: 1000;
-          font-size: 12px;
-          text-transform: uppercase;
-        }
+        .form { display: flex; flex-direction: column; gap: 14px; }
+        label { font-size: 12px; font-weight: 900; opacity: .85; }
 
         input {
-          padding: 14px;
-          border-radius: 18px;
-          border: 4px solid #000;
-          font-weight: 900;
+          background: rgba(0,0,0,.4);
+          border: 1.5px solid rgba(255,255,255,.12);
+          border-radius: 16px;
+          padding: 12px 14px;
+          color: #fff;
           font-size: 14px;
           outline: none;
-          background: #f8fafc;
-          box-shadow: 0 8px 0 rgba(0,0,0,.15);
         }
 
         button {
-          padding: 16px;
-          border-radius: 20px;
-          border: 4px solid #000;
-          background: #ffd84a;
-          font-weight: 1000;
-          font-size: 16px;
-          cursor: pointer;
-          box-shadow: 0 10px 0 #000;
-        }
-
-        button:active {
-          transform: translateY(3px);
-          box-shadow: 0 7px 0 #000;
-        }
-
-        button:disabled {
-          opacity: .6;
-          cursor: not-allowed;
-        }
-
-        .device {
-          font-size: 12px;
-          font-weight: 900;
-          opacity: 0.8;
-        }
-
-        .error {
-          background: #fee2e2;
-          border: 3px solid #000;
+          margin-top: 4px;
+          background: linear-gradient(135deg, #6ea2ff, #a77bff);
+          border: none;
           border-radius: 16px;
-          padding: 10px;
-          font-weight: 900;
-          font-size: 12px;
+          padding: 12px;
+          font-weight: 1000;
+          cursor: pointer;
         }
+
+        .telegram {
+          position: absolute;
+          top: 16px;
+          right: 16px;
+          color: rgba(255,255,255,.6);
+        }
+
+        .device { font-size: 11px; opacity: .6; }
+        .error { background: #3b0b0b; border-radius: 14px; padding: 10px; font-size: 12px; }
       `}</style>
     </div>
   );
