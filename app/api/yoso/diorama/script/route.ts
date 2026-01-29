@@ -23,31 +23,8 @@ function buildPrompt(input: {
 }) {
   const { topic, style, format, audience, genre, template } = input;
 
-  // === Hard lock cinematic diorama style (anti-toy) ===
-  const DIORAMA_LOCK = `
-STYLE LOCK (MUST FOLLOW):
-- Cinematic hyperrealistic miniature diorama photography (practical miniature set), NOT CGI.
-- Looks like a real film set built as a physical scale model (museum-quality).
-- Macro lens realism + cinematic lighting + film color grading.
-- Tilt-shift depth of field: shallow DOF but main subject remains sharp and readable.
-
-ANTI-TOY HARD RULES (NEVER DO):
-- No toy look, no plastic look, no doll faces, no cartoon, no clay.
-- No figurine bases, no display stands, no museum labels, no price tags.
-- No visible table surface, no human hands, no behind-the-scenes.
-- No LEGO, no papercraft, no action-figure vibe, no overly clean surfaces.
-
-TEXTURE LOCK:
-- Must show micro-textures: dust, scratches, chipped paint, weathering, moss, mud, worn wood grain, fabric fibers, stone pores.
-- Realistic imperfections and grime (period-appropriate), not smooth/sterile.
-
-CAMERA / LIGHT LOCK:
-- Cinematic lighting (golden hour / rim light / dramatic shadows / volumetric light if relevant).
-- High-end cinema camera feel, realistic contrast, natural highlights.
-`.trim();
-
   return `
-You are "AI Studio Script Generator" for YosoApp (Vibes App).
+You are "AI Studio Script Generator" for Vibes App (YosoApp legacy).
 
 Return ONLY valid JSON. No markdown. No explanations. No code fences.
 
@@ -65,42 +42,37 @@ The JSON structure MUST be:
   ]
 }
 
-ABSOLUTE RULES (DO NOT BREAK):
+HARD RULES (MUST FOLLOW):
 - Total scenes MUST be exactly 9.
 - Every field must exist and be non-empty string.
-- Output must be STRICT JSON only.
+- Output MUST feel like ONE connected story across 9 scenes (scene-1 -> scene-9).
+- Narrative language: Indonesian, natural storytelling, not poetic, not pantun, not lebay.
+- TOTAL narration across 9 scenes MUST be 85–120 Indonesian words (target 35–50 seconds voiceover).
+- Scene-1 MUST be a high-hook opener (12–22 words). Make people instantly curious.
+- Scene-2..Scene-8 MUST be short story beats (8–14 words each). Keep it direct.
+- Scene-9 MUST contain a CTA at the END ONLY (HARD RULE):
+  - Must include BOTH: "follow" and "komen"
+  - CTA must be 10–18 words, natural, not salesy.
+  - CTA MUST NOT appear in scene-1..scene-8.
 
-NARRATIVE STYLE RULES (IMPORTANT):
-- Language: Indonesian.
-- Must read like a NATURAL STORY, not poetry, not pantun, not puitis.
-- No over-embellished wording. Avoid flowery metaphors. Avoid "menggema di relung" type lines.
-- Each scene narrative: 2–4 short paragraphs OR 4–7 sentences max. Clear, straightforward, cinematic but grounded.
-- Make all 9 scenes one continuous story arc (same timeline, consistent characters/places).
-- Scene-to-scene continuity: each scene should reference what just happened before (cause→effect).
-- High hook in scene-1: start with a strong immediate situation/question/reveal in 1–2 sentences.
-- Build tension across scenes 2–8, resolve in scene-9.
+IMAGE PROMPT HARD RULES (WHISK READY):
+- imagePromptA/B MUST be ENGLISH.
+- Style MUST be: cinematic miniature diorama that looks REAL (not toy-looking).
+- ALWAYS WIDE / ESTABLISHING DIORAMA SHOT: full set visible, tiny figures visible head-to-toe.
+- FORBIDDEN: close-up portraits, face closeup, extreme closeup, headshot, tight framing, single-person close-up, macro portrait.
+- MUST include strong tilt-shift look with a very shallow focus plane, heavy bokeh, miniature scale illusion.
+- MUST look like a handcrafted physical set with authentic materials: weathered wood, cloth fibers, dust, patina, scratches, chipped paint, mud, stone grains.
+- MUST NOT show toy stands, support rods, display bases, transparent supports, foot stands, doll joints, plastic shine, action-figure seams.
+- MUST NOT look like CGI / 3D render / game asset.
+- Lighting: cinematic, moody documentary lighting, volumetric haze optional, realistic shadows.
+- Composition: wide diorama table/set perspective, small human figures, environment tells the story.
 
-CTA HARD RULES (MUST FOLLOW):
-- CTA ONLY appears in scene-9 narrative (last 2–3 sentences).
-- Scenes 1–8: NO CTA, NO "follow", NO "komen", NO "like", NO "subscribe", NO "share", NO "lonceng", NO "tag teman".
-- Scene-9 CTA must be NATURAL and not cringe:
-  - Ask viewer to comment their opinion/teori/pertanyaan about the story.
-  - Ask to follow for part lanjutan / cerita serupa.
-  - Keep CTA short (max 2–3 sentences).
-  - Do NOT mention "CTA" word.
-
-IMAGE PROMPT RULES:
-- imagePromptA/B must be ENGLISH.
-- Must follow the DIORAMA_LOCK below.
-- Must NOT look like a toy.
-- Must be historical miniature diorama, crowded tiny figures when appropriate, practical textures.
-- Ensure no "stand under feet" / "base plate" / "model display".
-- Provide concrete details: location, time of day, weather, props, clothing, environment materials.
-- Keep prompts focused and visual, no long narration.
+GLOBAL DIORAMA LOCK (append to EVERY imagePromptA/B, word-for-word):
+"PHYSICAL MINIATURE DIORAMA SET, WIDE ESTABLISHING SHOT, tiny full-body figures, handcrafted realism, no close-up portrait, no face closeup, no extreme closeup, strong tilt-shift lens effect, very shallow focus plane, heavy bokeh, miniature scale illusion, cinematic documentary lighting, realistic materials (dust, scratches, patina, cloth fibers, wood grain, chipped paint, mud), NOT CGI, NOT 3D render, NOT toy, no plastic shine, no doll joints, no stands, no support rods, no display base, no text, no watermark"
 
 VIDEO PROMPT RULES:
-- videoPrompt must be ENGLISH, 1–2 sentences only.
-- Must describe cinematic camera movement (push-in, tracking, crane, slow pan) + what is revealed.
+- videoPrompt MUST be ENGLISH, 1 sentence only, cinematic camera move.
+- Match the same "wide diorama establishing" constraint (no close-ups).
 
 Context:
 topic: ${topic}
@@ -110,17 +82,7 @@ audience: ${audience}
 genre: ${genre}
 template: ${template}
 
-GLOBAL VISUAL STYLE (apply to every imagePromptA/B):
-${DIORAMA_LOCK}
-
-SCENE DESIGN (9 panels):
-- Each scene must include:
-  - narrative: story beat
-  - imagePromptA: SETUP shot for that scene (wide/establishing or key action start)
-  - imagePromptB: CLIMAX shot for that scene (tension peak / consequence / reveal)
-  - videoPrompt: camera move describing the best shot of the scene
-
-Now output JSON only with exactly 9 scenes.
+Now output JSON only.
 `.trim();
 }
 
@@ -245,9 +207,6 @@ export async function POST(req: Request) {
       typeof s.videoPrompt !== "string"
     ) {
       return json({ ok: false, error: "SCENE_FIELD_INVALID", index: i, raw: s }, 500);
-    }
-    if (!s.id.trim() || !s.narrative.trim() || !s.imagePromptA.trim() || !s.imagePromptB.trim() || !s.videoPrompt.trim()) {
-      return json({ ok: false, error: "SCENE_FIELD_EMPTY", index: i, raw: s }, 500);
     }
   }
 
