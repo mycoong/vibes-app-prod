@@ -10,6 +10,9 @@ function json(data: any, status = 200) {
   });
 }
 
+/* =========================================================
+   Prompt builder (strict JSON contract)
+========================================================= */
 function buildPrompt(input: {
   topic: string;
   style: string;
@@ -49,7 +52,7 @@ GLOBAL RULES:
 NARRATIVE STYLE RULES:
 - Language: Indonesian.
 - Format: fakta unik dikemas sebagai cerita mengalir.
-- Tone: natural, informatif, seperti storyteller YouTube / TikTok sejarah.
+- Tone: natural, informatif, seperti storyteller konten edukasi.
 - No puisi.
 - No lebay.
 - No drama berlebihan.
@@ -62,7 +65,6 @@ NARRATIVE STYLE RULES:
 ABSOLUTE PROHIBITIONS:
 - Do NOT create fictional people (e.g., "Budi", "Andi", "seorang pemuda", dll).
 - Do NOT write like short story or novel.
-- Do NOT use emotional storytelling like film script.
 - Must feel like factual storytelling.
 
 CTA RULES:
@@ -70,15 +72,13 @@ CTA RULES:
 - Scene 9: MUST contain follow, komen, and part 2.
 - CTA must be the LAST sentence of scene 9.
 
-IMAGE PROMPT RULES (LOCKED DIORAMA LOOK FOR WHISK):
+IMAGE PROMPT RULES (LOCKED DIORAMA LOOK):
 - imagePromptA/B must be in ENGLISH.
 - Style: cinematic hyperreal miniature photography that feels like real world, not toy.
-- Must use: strong tilt-shift lens, shallow depth of field, miniature scale illusion.
-- Scene should feel like documentary film frame.
-- Lighting: cinematic, realistic, volumetric.
+- Must use: STRONG tilt-shift lens, shallow depth of field, miniature scale illusion.
+- Framing: medium-wide or wide framing, NOT close-up portraits.
+- Lighting: cinematic realistic, volumetric.
 - Textures: dust, rust, weathered surfaces, real materials.
-- Composition: medium-wide or wide framing, not close-up.
-- Avoid toy look.
 
 NEGATIVE (must explicitly avoid):
 toy, plastic, figurine, action figure, dollhouse, display stand, base platform, support rod, visible seam, CGI render, cartoon, illustration, fake miniature.
@@ -100,4 +100,99 @@ Return JSON only.
 `.trim();
 }
 
-/* route tetap sama seperti sebelumnya, tidak diubah */
+/* =========================================================
+   Route: support GET + POST to avoid 405
+========================================================= */
+export async function GET() {
+  return json({
+    ok: true,
+    message: "OK. Use POST with {topic, style, format, audience, genre, template, apiKeys[]} to generate scenes.",
+  });
+}
+
+export async function POST(req: Request) {
+  let body: any = {};
+  try {
+    body = await req.json();
+  } catch {}
+
+  const topic = String(body?.topic || "").trim();
+  const style = String(body?.style || "").trim();
+  const format = String(body?.format || "").trim();
+  const audience = String(body?.audience || "").trim();
+  const genre = String(body?.genre || "").trim();
+  const template = String(body?.template || "").trim();
+
+  const missing: string[] = [];
+  if (!topic) missing.push("topic");
+  if (!style) missing.push("style");
+  if (!format) missing.push("format");
+  if (!audience) missing.push("audience");
+  if (!genre) missing.push("genre");
+  if (!template) missing.push("template");
+
+  if (missing.length) {
+    return json({ ok: false, error: "MISSING_FIELDS", missing }, 400);
+  }
+
+  // Accept API keys from body
+  let keys: string[] = [];
+  if (Array.isArray(body?.apiKeys)) {
+    keys = body.apiKeys.map((k: any) => String(k || "").trim()).filter(Boolean);
+  } else {
+    keys = [body?.apiKey1, body?.apiKey2, body?.apiKey3, body?.apiKey4, body?.apiKey5]
+      .map((k: any) => String(k || "").trim())
+      .filter(Boolean);
+  }
+
+  if (!keys.length) {
+    return json(
+      { ok: false, error: "API_KEY_MISSING", message: "apiKeys[] or apiKey1..apiKey5 must be provided" },
+      400
+    );
+  }
+
+  const prompt = buildPrompt({ topic, style, format, audience, genre, template });
+
+  const result = await callGeminiWithRotation({ keys, prompt });
+
+  if (!result.ok) {
+    return json({ ok: false, error: result.error, raw: result.raw }, 500);
+  }
+
+  const jsonData = result.json;
+
+  if (!jsonData || typeof jsonData !== "object") {
+    return json({ ok: false, error: "JSON_INVALID", raw: result.text?.slice(0, 2000) }, 500);
+  }
+
+  const scenes = jsonData?.scenes;
+
+  if (!Array.isArray(scenes)) {
+    return json({ ok: false, error: "SCENES_NOT_ARRAY", raw: jsonData }, 500);
+  }
+
+  if (scenes.length !== 9) {
+    return json({ ok: false, error: "SCENES_COUNT_INVALID", count: scenes.length, raw: jsonData }, 500);
+  }
+
+  for (const [i, s] of scenes.entries()) {
+    if (
+      !s ||
+      typeof s.id !== "string" ||
+      typeof s.narrative !== "string" ||
+      typeof s.imagePromptA !== "string" ||
+      typeof s.imagePromptB !== "string" ||
+      typeof s.videoPrompt !== "string"
+    ) {
+      return json({ ok: false, error: "SCENE_FIELD_INVALID", index: i, raw: s }, 500);
+    }
+  }
+
+  return json({
+    ok: true,
+    scenes,
+    meta: { topic, style, format, audience, genre, template },
+    usedKeyIndex: result.usedKeyIndex,
+  });
+}
