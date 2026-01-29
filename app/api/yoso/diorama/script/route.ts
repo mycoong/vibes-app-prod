@@ -23,6 +23,29 @@ function buildPrompt(input: {
 }) {
   const { topic, style, format, audience, genre, template } = input;
 
+  // === Hard lock cinematic diorama style (anti-toy) ===
+  const DIORAMA_LOCK = `
+STYLE LOCK (MUST FOLLOW):
+- Cinematic hyperrealistic miniature diorama photography (practical miniature set), NOT CGI.
+- Looks like a real film set built as a physical scale model (museum-quality).
+- Macro lens realism + cinematic lighting + film color grading.
+- Tilt-shift depth of field: shallow DOF but main subject remains sharp and readable.
+
+ANTI-TOY HARD RULES (NEVER DO):
+- No toy look, no plastic look, no doll faces, no cartoon, no clay.
+- No figurine bases, no display stands, no museum labels, no price tags.
+- No visible table surface, no human hands, no behind-the-scenes.
+- No LEGO, no papercraft, no action-figure vibe, no overly clean surfaces.
+
+TEXTURE LOCK:
+- Must show micro-textures: dust, scratches, chipped paint, weathering, moss, mud, worn wood grain, fabric fibers, stone pores.
+- Realistic imperfections and grime (period-appropriate), not smooth/sterile.
+
+CAMERA / LIGHT LOCK:
+- Cinematic lighting (golden hour / rim light / dramatic shadows / volumetric light if relevant).
+- High-end cinema camera feel, realistic contrast, natural highlights.
+`.trim();
+
   return `
 You are "AI Studio Script Generator" for YosoApp (Vibes App).
 
@@ -42,53 +65,44 @@ The JSON structure MUST be:
   ]
 }
 
-ABSOLUTE RULES:
+ABSOLUTE RULES (DO NOT BREAK):
 - Total scenes MUST be exactly 9.
 - Every field must exist and be non-empty string.
-- Output must be STRICT JSON (double quotes, no trailing commas).
-- Do NOT include extra keys outside the structure.
-- Do NOT use poetry. Do NOT use pantun. Do NOT be overly dramatic. Do NOT be lyrical.
-- Narration MUST feel like a natural story told by a human creator: clear, grounded, interesting, easy to understand.
-- Use Indonesian that sounds modern and conversational, but still berbobot.
-- Avoid flowery metaphors. Avoid "di balik kabut", "bara perjuangan", "membentang asa", etc.
-- Keep each narrative suitable for voiceover: 2–4 sentences per scene.
-- Max length per scene: 70 words.
+- Output must be STRICT JSON only.
 
-STORY STRUCTURE (VERY IMPORTANT):
-Scene-1 = STRONG HOOK (high curiosity, immediate stakes, makes viewer stop scrolling)
-- Start with a punchy line that creates mystery or stakes.
-- Mention a specific time/place/detail.
-- End with a small cliffhanger / unanswered question.
+NARRATIVE STYLE RULES (IMPORTANT):
+- Language: Indonesian.
+- Must read like a NATURAL STORY, not poetry, not pantun, not puitis.
+- No over-embellished wording. Avoid flowery metaphors. Avoid "menggema di relung" type lines.
+- Each scene narrative: 2–4 short paragraphs OR 4–7 sentences max. Clear, straightforward, cinematic but grounded.
+- Make all 9 scenes one continuous story arc (same timeline, consistent characters/places).
+- Scene-to-scene continuity: each scene should reference what just happened before (cause→effect).
+- High hook in scene-1: start with a strong immediate situation/question/reveal in 1–2 sentences.
+- Build tension across scenes 2–8, resolve in scene-9.
 
-Scene-2 to Scene-8 = STORY FLOW
-- Continue naturally, chronological, cause-effect.
-- Each scene reveals 1 new detail, not repeating.
-- Keep it grounded: who/where/what happened, why it matters.
-- Make it engaging but not exaggerated.
+CTA HARD RULES (MUST FOLLOW):
+- CTA ONLY appears in scene-9 narrative (last 2–3 sentences).
+- Scenes 1–8: NO CTA, NO "follow", NO "komen", NO "like", NO "subscribe", NO "share", NO "lonceng", NO "tag teman".
+- Scene-9 CTA must be NATURAL and not cringe:
+  - Ask viewer to comment their opinion/teori/pertanyaan about the story.
+  - Ask to follow for part lanjutan / cerita serupa.
+  - Keep CTA short (max 2–3 sentences).
+  - Do NOT mention "CTA" word.
 
-Scene-9 = CLOSING + CTA (FOLLOW + COMMENT) MUST be NATURAL and attached to the story.
-- Scene-9 narrative MUST conclude the story first, then CTA.
-- CTA must not feel like an ad. No shouting. No spam.
+IMAGE PROMPT RULES:
+- imagePromptA/B must be ENGLISH.
+- Must follow the DIORAMA_LOCK below.
+- Must NOT look like a toy.
+- Must be historical miniature diorama, crowded tiny figures when appropriate, practical textures.
+- Ensure no "stand under feet" / "base plate" / "model display".
+- Provide concrete details: location, time of day, weather, props, clothing, environment materials.
+- Keep prompts focused and visual, no long narration.
 
-HARD CTA RULES (MUST FOLLOW, NO EXCUSES):
-- ONLY Scene-9 may contain CTA.
-- Scene-1 to Scene-8 MUST NOT contain any CTA, any engagement request, or any social words.
-- Scene-1..8 MUST NOT include these words/phrases (case-insensitive), in any form:
-  follow, follow me, following, komen, komentar, comment, like, share, subscribe, subcribe, subscribe dong,
-  notif, notifikasi, lonceng, bell, caption, tag, DM, inbox, bio, link in bio, klik link, cek link, join,
-  jangan lupa, dukung, support, viral, fyp, trending, part 2, lanjut part, next part, save, simpan, repost
-- Scene-1..8 MUST NOT mention: "kalau kamu", "tulis di komentar", "klik", "follow untuk", "jangan lupa", or any equivalent CTA phrasing.
-- If any CTA words appear in Scene-1..8, the output is INVALID and must be regenerated.
+VIDEO PROMPT RULES:
+- videoPrompt must be ENGLISH, 1–2 sentences only.
+- Must describe cinematic camera movement (push-in, tracking, crane, slow pan) + what is revealed.
 
-CTA FORMAT (Scene-9 ONLY):
-- Scene-9 CTA must be 1–2 short sentences.
-- CTA MUST include:
-  (1) Ask to comment ONE keyword only: "LANJUT"
-  (2) Invite to follow in a calm way.
-- Scene-9 MUST be the only place where the word "LANJUT" appears.
-- Scene-9 total max 55 words.
-
-CONTENT CONTEXT:
+Context:
 topic: ${topic}
 style: ${style}
 format: ${format}
@@ -96,29 +110,17 @@ audience: ${audience}
 genre: ${genre}
 template: ${template}
 
-NARRATIVE GUIDANCE (Indonesian):
-- Use concrete details: waktu, tempat, suasana, tindakan.
-- Keep sentences short-to-medium. No long run-on sentences.
-- Make it "serius bold" like a real product, not a skin.
-- Maintain one coherent story arc across 9 scenes.
+GLOBAL VISUAL STYLE (apply to every imagePromptA/B):
+${DIORAMA_LOCK}
 
-IMAGE PROMPTS:
-- imagePromptA/B: ENGLISH photorealistic historical miniature diorama, macro tilt-shift, shallow depth of field, visible physical textures (moss, dust, cracked wood, mud, stone), documentary lighting, no CGI look, no human hands, crowded tiny figures.
-- For each scene:
-  - Prompt A = setup/approach angle (calmer, establishing shot)
-  - Prompt B = climax/impact angle (more tension/action)
-- IMPORTANT: imagePromptA and imagePromptB MUST be different compositions/angles.
-- No text on image. No captions. No logos.
+SCENE DESIGN (9 panels):
+- Each scene must include:
+  - narrative: story beat
+  - imagePromptA: SETUP shot for that scene (wide/establishing or key action start)
+  - imagePromptB: CLIMAX shot for that scene (tension peak / consequence / reveal)
+  - videoPrompt: camera move describing the best shot of the scene
 
-VIDEO PROMPT:
-- ENGLISH, 1–2 sentences, cinematic camera movement (push-in, crane, tracking).
-- Mention subject and environment consistent with the scene.
-
-CONSISTENCY:
-- The 9 scenes must belong to ONE coherent story about the topic.
-- The visuals must match the narrative for each scene.
-
-Now output JSON only.
+Now output JSON only with exactly 9 scenes.
 `.trim();
 }
 
@@ -244,13 +246,7 @@ export async function POST(req: Request) {
     ) {
       return json({ ok: false, error: "SCENE_FIELD_INVALID", index: i, raw: s }, 500);
     }
-    if (
-      !s.id.trim() ||
-      !s.narrative.trim() ||
-      !s.imagePromptA.trim() ||
-      !s.imagePromptB.trim() ||
-      !s.videoPrompt.trim()
-    ) {
+    if (!s.id.trim() || !s.narrative.trim() || !s.imagePromptA.trim() || !s.imagePromptB.trim() || !s.videoPrompt.trim()) {
       return json({ ok: false, error: "SCENE_FIELD_EMPTY", index: i, raw: s }, 500);
     }
   }
