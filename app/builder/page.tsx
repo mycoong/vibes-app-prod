@@ -42,7 +42,9 @@ function getAllApiKeysFromStorage(): string[] {
     if (!raw) return [];
     const parsed = JSON.parse(raw);
     if (!Array.isArray(parsed)) return [];
-    return parsed.map((s: any) => String(s?.apiKey || "").trim()).filter(Boolean);
+    return parsed
+      .map((s: any) => String(s?.apiKey || "").trim())
+      .filter(Boolean);
   } catch {
     return [];
   }
@@ -79,7 +81,11 @@ function readWhiskRef(): WhiskRef | null {
     const description = String(j?.description || "").trim();
     const filename = String(j?.filename || "").trim();
     if (!mediaId) return null;
-    return { mediaId, description: description || "MAIN_CHARACTER", filename: filename || "ref.png" };
+    return {
+      mediaId,
+      description: description || "MAIN_CHARACTER",
+      filename: filename || "ref.png",
+    };
   } catch {
     return null;
   }
@@ -122,7 +128,6 @@ export default function BuilderIdeaPage() {
   const [loadingMsg, setLoadingMsg] = useState(LOADING_MESSAGES[0]);
   const [msg, setMsg] = useState("");
   const [isWhiskUploading, setIsWhiskUploading] = useState(false);
-
   const intervalRef = useRef<number | null>(null);
 
   useEffect(() => {
@@ -272,141 +277,146 @@ export default function BuilderIdeaPage() {
   }
 
   async function onBuild() {
-  if (!mounted) return;
-
-  const t = String(topic || "").trim();
-  if (!t) {
-    setMsg("TOPIC_EMPTY → isi kisah dulu");
-    return;
-  }
-
-  setMsg("");
-  setIsBuilding(true);
-
-  try {
-    const apiKeys = getAllApiKeysFromStorage();
-    setApiCount(apiKeys.length);
-    if (!apiKeys.length) {
-      setMsg("API_KEY_MISSING → buka Settings, isi dulu 1-5 API key");
-      setIsBuilding(false);
+    if (!mounted) return;
+    const t = String(topic || "").trim();
+    if (!t) {
+      setMsg("TOPIC_EMPTY → isi kisah dulu");
       return;
     }
+    setMsg("");
+    setIsBuilding(true);
+    try {
+      const apiKeys = getAllApiKeysFromStorage();
+      setApiCount(apiKeys.length);
+      if (!apiKeys.length) {
+        setMsg("API_KEY_MISSING → buka Settings, isi dulu 1-5 API key");
+        setIsBuilding(false);
+        return;
+      }
+      const payload = {
+        topic: t,
+        style,
+        format,
+        audience: "LOCAL",
+        genre: "DRAMA",
+        template: "VIRAL_DRAMA",
+        apiKeys,
+      };
 
-    const payload = {
-      topic: t,
-      style,
-      format,
-      audience: "LOCAL",
-      genre: "DRAMA",
-      template: "VIRAL_DRAMA",
-      apiKeys,
-    };
+      persistMeta({
+        topic: t,
+        style,
+        format,
+        audience: "LOCAL",
+        genre: "DRAMA",
+        template: "VIRAL_DRAMA",
+        refImageDataUrl: refImage ? "[HAS_REF_IMAGE]" : "",
+      });
 
-    // simpan meta biar konsisten
-    persistMeta({
-      topic: t,
-      style,
-      format,
-      audience: "LOCAL",
-      genre: "DRAMA",
-      template: "VIRAL_DRAMA",
-      refImageDataUrl: refImage ? "[HAS_REF_IMAGE]" : "",
-    });
+      const r = await fetch("/api/yoso/diorama/script", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify(payload),
+        cache: "no-store",
+      });
 
-    const r = await fetch("/api/yoso/diorama/script", {
-      method: "POST",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify(payload),
-      cache: "no-store",
-    });
+      const j = await r.json().catch(() => null);
+      if (!r.ok || !j?.ok || !Array.isArray(j?.scenes) || j.scenes.length !== 9) {
+        const err = String(j?.error || `HTTP_${r.status}`);
+        setMsg(`GEN_FAILED: ${err}`);
+        setIsBuilding(false);
+        return;
+      }
 
-    const j = await r.json().catch(() => null);
+      localStorage.setItem(
+        "YOSO_LAST_SCENES",
+        JSON.stringify({ scenes: j.scenes, meta: j.meta || payload, savedAt: Date.now() })
+      );
 
-    if (!r.ok || !j?.ok || !Array.isArray(j?.scenes) || j.scenes.length !== 9) {
-      const err = String(j?.error || `HTTP_${r.status}`);
-      setMsg(`GEN_FAILED: ${err}`);
+      window.location.href = "/builder/panels";
+    } catch (e: any) {
+      setMsg(`GEN_FAILED: ${String(e?.message || e)}`);
       setIsBuilding(false);
-      return;
     }
-
-    // ini yang dibaca oleh /builder/panels
-    localStorage.setItem(
-      "YOSO_LAST_SCENES",
-      JSON.stringify({ scenes: j.scenes, meta: j.meta || payload, savedAt: Date.now() })
-    );
-
-    window.location.href = "/builder/panels";
-  } catch (e: any) {
-    setMsg(`GEN_FAILED: ${String(e?.message || e)}`);
-    setIsBuilding(false);
   }
-}
+
   return (
-    <div className="wrap">
-      <div className="topRow">
-  <div className="badgeRow">
-    <div className={`pill ${mounted && apiCount ? "ok" : "bad"}`}>
-      {mounted ? (apiCount ? `${apiCount} API Keys Loaded` : "API Keys Missing") : "Loading..."}
-    </div>
-    {refImage ? <div className="pill ok">REF IMAGE: ON</div> : <div className="pill">REF IMAGE: OFF</div>}
-  </div>
+    <div className="pg">
+      <div className="hdr">
+        <div className="hdrLeft">
+          <div className="hdrIcon" aria-hidden="true">🌀</div>
+          <div className="hdrTitle">NUSANTARA DIORAMA AI</div>
+        </div>
+        <div className="hdrRight">
+          <button
+            className="hdrBtn"
+            type="button"
+            onClick={() => window.open("/whisk", "whisk_login", "width=760,height=760,noopener,noreferrer")}
+            title="Login Whisk"
+          >
+            🧪
+          </button>
+          <button className="hdrBtn" type="button" onClick={() => (window.location.href = "/settings")} title="Settings">
+            ⚙️
+          </button>
+        </div>
+      </div>
 
-  <div className="topActions">
-    <button
-      className="settingsBtn"
-      type="button"
-      onClick={() => window.open("/whisk", "whisk_login", "width=760,height=760,noopener,noreferrer")}
-    >
-      🧪 LOGIN WHISK
-    </button>
-
-    <button className="settingsBtn" type="button" onClick={() => (window.location.href = "/settings")}>
-      ⚙️ SETTINGS
-    </button>
-  </div>
-</div>
-
-
-      <div className="stage">
-        <div className="card">
-          <div className="hero">
-            <img className="vibesLogo" src="/vibes-logo.png" alt="Vibes App" />
-            <div className="vibesSlogan">moment that take you there</div>
+      <div className="outer">
+        <div className="sheet">
+          <div className="titleBlock">
+            <div className="big">
+              BUAT <span className="purple">DIORAMA</span>
+            </div>
+            <div className="big">SEJARAH</div>
+            <div className="sub">PHYSICAL MACRO MINIATURE STORYTELLER</div>
           </div>
 
-          <div className="section">
-            <div className="label cyan">1. PILIH KATEGORI</div>
-            <div className="grid2">
+          <div className="sec">
+            <div className="secHead">
+              <div className="tag tagCyan">1. PILIH KATEGORI</div>
+              <div className="miniInfo">
+                <span className={`pill ${mounted && apiCount ? "ok" : "bad"}`}>
+                  {mounted ? (apiCount ? `${apiCount} API` : "API Missing") : "Loading"}
+                </span>
+                <span className={`pill ${refImage ? "ok" : ""}`}>{refImage ? "REF ON" : "REF OFF"}</span>
+              </div>
+            </div>
+
+            <div className="grid">
               {STYLE_OPTIONS.map((o) => {
                 const active = o.value === style;
                 return (
                   <button
                     key={o.value}
-                    className={`box ${active ? "activeYellow" : ""}`}
+                    className={`choice ${active ? "active" : ""}`}
                     type="button"
                     onClick={() => {
                       setStyle(o.value);
                       persistMeta({ ...meta, style: o.value });
                     }}
                   >
-                    <span className="ico">{o.icon}</span>
-                    <span className="txt">{o.label}</span>
+                    <span className="ico" aria-hidden="true">{o.icon}</span>
+                    <span className="lbl">{o.label}</span>
                   </button>
                 );
               })}
             </div>
           </div>
 
-          <div className="section row2">
-            <div className="left">
-              <div className="label pink">2. FORMAT</div>
-              <div className="fmtRow">
+          <div className="sec">
+            <div className="secHead">
+              <div className="tag tagPink">2. FORMAT</div>
+            </div>
+
+            <div className="formatRow">
+              <div className="fmtBtns">
                 {FORMAT_OPTIONS.map((o) => {
                   const active = o.value === format;
                   return (
                     <button
                       key={o.value}
-                      className={`fmt ${active ? "fmtActive" : ""}`}
+                      className={`fmtBtn ${active ? "fmtOn" : ""}`}
                       type="button"
                       onClick={() => {
                         setFormat(o.value);
@@ -418,46 +428,47 @@ export default function BuilderIdeaPage() {
                   );
                 })}
               </div>
-            </div>
 
-            <div className="right refBox">
-              <label className="refInner">
-                <input
-                  className="refInput"
-                  type="file"
-                  accept="image/*"
-                  onChange={(e) => onPickRefImage(e.target.files?.[0] || null)}
-                />
+              <div className="refWrap">
+                <label className={`refCard ${refImage ? "hasImg" : ""}`}>
+                  <input
+                    className="refInput"
+                    type="file"
+                    accept="image/*"
+                    onChange={(e) => onPickRefImage(e.target.files?.[0] || null)}
+                  />
+                  {refImage ? (
+                    <img className="refImg" src={refImage} alt="Ref" />
+                  ) : (
+                    <div className="refEmpty">
+                      <div className="refUp" aria-hidden="true">⬆️</div>
+                      <div className="refTxt">REF IMAGE</div>
+                      <div className="refHint">tap untuk upload</div>
+                    </div>
+                  )}
+                </label>
+
                 {refImage ? (
-                  <img className="refPreview" src={refImage} alt="Ref" />
-                ) : (
-                  <>
-                    <div className="up">⬆️</div>
-                    <div className="refTxt">REF IMAGE</div>
-                    <div className="refHint">(tap untuk upload)</div>
-                  </>
-                )}
-              </label>
+                  <button className="refX" type="button" onClick={onClearRefImage} title="Clear ref">
+                    ✖
+                  </button>
+                ) : null}
 
-              {refImage ? (
-                <button className="refClear" type="button" onClick={onClearRefImage}>
-                  ✖
-                </button>
-              ) : null}
-
-              {isWhiskUploading ? <div className="miniLoading">Uploading…</div> : null}
+                {isWhiskUploading ? <div className="refUploading">Uploading…</div> : null}
+              </div>
             </div>
           </div>
 
-          <div className="section">
-            <div className="label cyan">3. TENTUKAN KISAH</div>
-
-            <button className="randomBtn" type="button" onClick={onPickRandomTopic} disabled={!mounted || isSearching}>
-              ⚡ {isSearching ? "MENCARI TOPIK..." : "CARI TOPIK (SEJARAH)"}
-            </button>
+          <div className="sec">
+            <div className="secHead">
+              <div className="tag tagCyan">3. TENTUKAN KISAH</div>
+              <button className="zap" type="button" onClick={onPickRandomTopic} disabled={!mounted || isSearching}>
+                ⚡ {isSearching ? "MENCARI..." : "CARI TOPIK (SEJARAH)"}
+              </button>
+            </div>
 
             <textarea
-              className="topicArea"
+              className="ta"
               value={topic}
               onChange={(e) => {
                 setTopic(e.target.value);
@@ -470,339 +481,181 @@ export default function BuilderIdeaPage() {
             {msg ? <div className="msg">{msg}</div> : null}
           </div>
 
-          <button className="buildBtn" type="button" onClick={onBuild} disabled={!mounted || isBuilding}>
-            GENERATE
+          <button className="cta" type="button" onClick={onBuild} disabled={!mounted || isBuilding}>
+            BANGUN DIORAMA!
           </button>
         </div>
       </div>
 
       {isBuilding ? (
-        <div className="loadingOverlay">
-          <div className="loadingCard">
-            <div className="spinnerWrap">
-              <div className="spinner">C</div>
-            </div>
-            <div className="loadingTitle">MEMBANGUN DIORAMA...</div>
-            <div className="loadingQuote">“{loadingMsg}”</div>
+        <div className="ov">
+          <div className="ovCard">
+            <div className="spin" aria-hidden="true">C</div>
+            <div className="ovT">MEMBANGUN DIORAMA...</div>
+            <div className="ovQ">“{loadingMsg}”</div>
           </div>
         </div>
       ) : null}
 
       <style>{`
-        *{ box-sizing: border-box; }
-        html,body{ margin:0; padding:0; }
-        .wrap{
-          min-height: 100vh;
-          background: radial-gradient(1200px 800px at 20% 0%, #0b1b3a 0%, #060a14 60%, #050712 100%);
-          padding: 18px;
-          color:#111;
-          font-family: ui-rounded, "Comic Sans MS", "Trebuchet MS", system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif;
-          position: relative;
-          overflow-x: hidden;
+        :root{
+          --ink:#151515;
+          --paper:#fbfbfb;
+          --yellow:#f7d54a;
+          --purple:#7b56ff;
+          --cyan:#3ddad8;
+          --pink:#ff58a8;
         }
 
-        /* TOP (bukan sticky/fixed, ikut scroll normal) */
-        .topRow{
-          width: 100%;
-          display:flex;
-          justify-content: space-between;
-          align-items: flex-start;
-          gap: 12px;
-          margin-bottom: 14px;
+        .pg{ min-height:100vh; background:#0b0b0b; color:var(--ink); }
+
+        .hdr{
+          position:sticky; top:0; z-index:20;
+          display:flex; align-items:center; justify-content:space-between; gap:12px;
+          padding:12px 14px; background:var(--yellow); border-bottom:4px solid var(--ink);
         }
-        .badgeRow{
-          display:flex;
-          gap:10px;
-          flex-wrap: wrap;
-          justify-content: flex-start;
-          min-width: 0;
+        .hdrLeft{ display:flex; align-items:center; gap:10px; min-width:0; }
+        .hdrIcon{
+          width:34px; height:34px; border:3px solid var(--ink); border-radius:10px; background:#fff;
+          display:flex; align-items:center; justify-content:center; font-size:18px; line-height:1;
+          box-shadow:0 2px 0 rgba(0,0,0,.15); flex:0 0 auto;
         }
+        .hdrTitle{
+          font-weight:900; letter-spacing:.5px; font-size:16px;
+          white-space:nowrap; overflow:hidden; text-overflow:ellipsis;
+        }
+        .hdrRight{ display:flex; align-items:center; gap:8px; flex:0 0 auto; }
+        .hdrBtn{
+          width:38px; height:38px; border-radius:12px; border:3px solid var(--ink); background:#fff;
+          box-shadow:0 3px 0 rgba(0,0,0,.18); font-weight:900; cursor:pointer;
+        }
+
+        .outer{ display:flex; justify-content:center; padding:18px 14px 24px; }
+
+        .sheet{
+          width:min(520px, 100%);
+          background: radial-gradient(rgba(0,0,0,.08) 1px, transparent 1px) 0 0/10px 10px, #fff;
+          border:4px solid var(--ink); border-radius:26px;
+          padding:16px 14px 14px; box-shadow:0 10px 0 rgba(0,0,0,.35);
+        }
+
+        .titleBlock{ text-align:center; padding:6px 8px 14px; }
+        .big{
+          font-weight:1000; font-size:34px; line-height:1.02; letter-spacing:.5px;
+          text-transform:uppercase; text-shadow:0 2px 0 rgba(0,0,0,.10);
+        }
+        .purple{ color:var(--purple); }
+        .sub{ margin-top:10px; font-size:12px; letter-spacing:1.5px; font-weight:800; opacity:.75; }
+
+        .sec{ margin-top:12px; }
+        .secHead{ display:flex; align-items:center; justify-content:space-between; gap:10px; margin-bottom:10px; }
+
+        .tag{
+          display:inline-block; padding:7px 10px; border-radius:10px; border:3px solid var(--ink);
+          font-weight:950; font-size:13px; background:#fff; box-shadow:0 3px 0 rgba(0,0,0,.12);
+        }
+        .tagCyan{ background:rgba(61,218,216,.45); }
+        .tagPink{ background:rgba(255,88,168,.35); }
+
+        .miniInfo{ display:flex; gap:6px; flex-wrap:wrap; justify-content:flex-end; }
         .pill{
-          font-size: 12px; font-weight: 1000;
-          padding: 10px 12px;
-          border-radius: 999px;
-          border: 3px solid #000;
-          background: #fff;
-          box-shadow: 0 8px 0 rgba(0,0,0,.12);
-          white-space: nowrap;
+          padding:6px 8px; border-radius:999px; border:2px solid var(--ink); background:#fff;
+          font-weight:900; font-size:11px; opacity:.92;
         }
-        .pill.ok{ background:#dcfce7; }
-        .pill.bad{ background:#fee2e2; }
+        .pill.ok{ background:rgba(61,218,216,.35); }
+        .pill.bad{ background:rgba(255,88,168,.25); }
 
-        .settingsBtn{
-          border: 4px solid #000;
-          border-radius: 16px;
-          padding: 10px 12px;
-          background: #ffd84a;
-          font-weight: 1000;
-          box-shadow: 0 10px 0 rgba(0,0,0,.18);
-          cursor: pointer;
-          flex: 0 0 auto;
+        .grid{ display:grid; grid-template-columns:1fr 1fr; gap:10px; }
+        .choice{
+          display:flex; align-items:center; gap:10px; padding:12px 12px;
+          border-radius:14px; border:4px solid var(--ink); background:#fff;
+          box-shadow:0 6px 0 rgba(0,0,0,.18); cursor:pointer; text-align:left; min-height:56px;
         }
-        .settingsBtn:active{ transform: translateY(2px); box-shadow: 0 8px 0 rgba(0,0,0,.18); }
+        .choice .ico{ font-size:18px; }
+        .choice .lbl{ font-weight:950; font-size:13px; letter-spacing:.2px; }
+        .choice.active{ background:rgba(247,213,74,.9); }
 
-        .stage{ display:flex; justify-content:center; align-items:flex-start; }
-        .card{
-          width: min(520px, 94vw);
-          background: radial-gradient(circle at 1px 1px, rgba(0,0,0,.08) 1px, transparent 1px), #fff;
-          background-size: 8px 8px;
-          border: 8px solid #000;
-          border-radius: 28px;
-          box-shadow: 0 22px 70px rgba(0,0,0,.45);
-          padding: 16px;
+        .formatRow{ display:grid; grid-template-columns:1fr 1fr; gap:10px; align-items:stretch; }
+        .fmtBtns{ display:flex; gap:10px; }
+        .fmtBtn{
+          flex:1; border-radius:14px; border:4px solid var(--ink); background:#fff;
+          box-shadow:0 6px 0 rgba(0,0,0,.18); padding:12px 10px;
+          font-weight:1000; font-size:14px; cursor:pointer;
         }
+        .fmtBtn.fmtOn{ background:rgba(247,213,74,.9); }
 
-        .hero{ text-align:center; padding: 8px 0 10px; }
-        .vibesLogo{
-          width: 190px;
-          height: 190px;
-          object-fit: contain;
-          display:block;
-          margin: 0 auto;
+        .refWrap{ position:relative; width:100%; }
+        .refCard{
+          width:100%; height:100%;
+          border-radius:14px; border:3px dashed var(--ink);
+          background:rgba(0,0,0,.03); display:flex; align-items:center; justify-content:center;
+          box-shadow:0 6px 0 rgba(0,0,0,.12); cursor:pointer; overflow:hidden; min-height:52px;
         }
-        .vibesSlogan{
-          margin-top: 6px;
-          font-weight: 1000;
-          font-size: 12px;
-          letter-spacing: .4px;
-          text-transform: lowercase;
-          opacity: .85;
-        }
-
-        .section{ margin-top: 14px; }
-
-        .label{
-          display:inline-block;
-          font-weight: 1000;
-          font-size: 12px;
-          text-transform: uppercase;
-          padding: 8px 10px;
-          border: 4px solid #000;
-          border-radius: 16px;
-          background:#fff;
-          box-shadow: 0 10px 0 rgba(0,0,0,.12);
-        }
-        .label.cyan{ background:#a7f3d0; }
-        .label.pink{ background:#fbcfe8; }
-
-        .grid2{
-          display:grid;
-          grid-template-columns: 1fr 1fr;
-          gap: 10px;
-          margin-top: 10px;
-        }
-        .box{
-          border: 4px solid #000;
-          border-radius: 18px;
-          padding: 12px 12px;
-          background:#fff;
-          box-shadow: 0 10px 0 rgba(0,0,0,.12);
-          font-weight: 1000;
-          cursor: pointer;
-          display:flex;
-          align-items:center;
-          gap: 10px;
-          min-width: 0;
-        }
-        .box:active{ transform: translateY(2px); box-shadow: 0 8px 0 rgba(0,0,0,.12); }
-        .activeYellow{ background:#ffd84a; }
-        .ico{ width: 24px; text-align:center; flex: 0 0 auto; }
-        .txt{ font-size: 12px; letter-spacing: .3px; overflow:hidden; text-overflow: ellipsis; white-space: nowrap; }
-
-        .row2{
-          display:grid;
-          grid-template-columns: 1fr 150px;
-          gap: 14px;
-          align-items: stretch;
-          margin-top: 14px;
-        }
-
-        .fmtRow{ display:flex; gap:10px; margin-top: 10px; }
-        .fmt{
-          flex:1;
-          border: 4px solid #000;
-          border-radius: 18px;
-          padding: 12px 10px;
-          background:#fff;
-          box-shadow: 0 10px 0 rgba(0,0,0,.12);
-          font-weight: 1000;
-          cursor: pointer;
-        }
-        .fmt:active{ transform: translateY(2px); box-shadow: 0 8px 0 rgba(0,0,0,.12); }
-        .fmtActive{ background:#ffd84a; }
-
-        .refBox{
-          position: relative;
-          border: 4px solid #000;
-          border-radius: 18px;
-          background: #fff;
-          box-shadow: 0 10px 0 rgba(0,0,0,.12);
-          overflow:hidden;
-          min-height: 120px;
-        }
-        .refInner{
-          display:flex;
-          flex-direction: column;
-          align-items:center;
-          justify-content:center;
-          width: 100%;
-          height: 100%;
-          cursor: pointer;
-          padding: 10px;
-        }
+        .refCard.hasImg{ border-style:solid; background:#fff; }
         .refInput{ display:none; }
-        .refPreview{ width:100%; height:100%; object-fit: cover; }
-        .up{ font-weight:1000; font-size: 18px; }
-        .refTxt{ font-weight:1000; font-size: 12px; margin-top: 4px; }
-        .refHint{ font-weight:1000; font-size: 10px; opacity:.6; margin-top: 2px; }
-        .refClear{
-          position:absolute;
-          top: 8px;
-          right: 8px;
-          border: 3px solid #000;
-          border-radius: 12px;
-          background: #fff;
-          font-weight: 1000;
-          padding: 6px 8px;
-          cursor:pointer;
+        .refEmpty{ text-align:center; }
+        .refUp{ font-size:18px; font-weight:900; }
+        .refTxt{ font-weight:1000; font-size:12px; margin-top:2px; }
+        .refHint{ font-size:11px; opacity:.7; margin-top:2px; }
+        .refImg{ width:100%; height:100%; object-fit:cover; display:block; }
+        .refX{
+          position:absolute; top:-8px; right:-8px;
+          width:30px; height:30px; border-radius:12px; border:3px solid var(--ink); background:#fff;
+          font-weight:1000; cursor:pointer; box-shadow:0 4px 0 rgba(0,0,0,.18);
         }
-        .miniLoading{
-          position:absolute;
-          left: 8px;
-          bottom: 8px;
-          font-size: 10px;
-          font-weight: 1000;
-          background:#fff;
-          border: 3px solid #000;
-          border-radius: 999px;
-          padding: 6px 8px;
-          box-shadow: 0 8px 0 rgba(0,0,0,.12);
-        }
+        .refUploading{ position:absolute; bottom:-18px; right:2px; font-size:11px; font-weight:900; opacity:.8; }
 
-        .randomBtn{
-          margin-top: 10px;
-          width: 100%;
-          border: 4px solid #000;
-          border-radius: 18px;
-          padding: 12px 12px;
-          background:#a7f3d0;
-          box-shadow: 0 10px 0 rgba(0,0,0,.12);
-          font-weight: 1000;
-          cursor: pointer;
-          text-transform: uppercase;
-          letter-spacing: .3px;
+        .zap{
+          border-radius:12px; border:3px solid var(--ink); background:rgba(123,86,255,.16);
+          box-shadow:0 4px 0 rgba(0,0,0,.14); padding:8px 10px;
+          font-weight:1000; font-size:12px; cursor:pointer; white-space:nowrap;
         }
-        .randomBtn:disabled{ opacity:.6; cursor:not-allowed; }
-        .randomBtn:active{ transform: translateY(2px); box-shadow: 0 8px 0 rgba(0,0,0,.12); }
+        .zap:disabled{ opacity:.6; cursor:not-allowed; }
 
-        .topicArea{
-          margin-top: 10px;
-          width: 100%;
-          min-height: 120px;
-          resize: vertical;
-          border: 4px solid #000;
-          border-radius: 18px;
-          padding: 12px 12px;
-          font-weight: 900;
-          outline: none;
-          background:#fff;
-          box-shadow: inset 0 10px 0 rgba(0,0,0,.06);
+        .ta{
+          width:100%; min-height:120px; resize:none;
+          border-radius:18px; border:4px solid var(--ink); background:#fff;
+          padding:14px 14px; font-size:14px; outline:none;
+          box-shadow:0 8px 0 rgba(0,0,0,.20);
         }
         .msg{
-          margin-top: 10px;
-          border: 4px solid #000;
-          border-radius: 18px;
-          padding: 10px 12px;
-          font-weight: 1000;
-          background:#fff;
+          margin-top:10px; padding:10px 12px; border-radius:14px; border:3px solid var(--ink);
+          background:rgba(255,88,168,.12); font-weight:900; font-size:12px; word-break:break-word;
         }
 
-        .buildBtn{
-          margin-top: 14px;
-          width: 100%;
-          border: 6px solid #000;
-          border-radius: 22px;
-          padding: 16px 12px;
-          background:#ffd84a;
-          box-shadow: 0 14px 0 rgba(0,0,0,.18);
-          font-weight: 1000;
-          font-size: 18px;
-          cursor: pointer;
-          text-transform: uppercase;
-          letter-spacing: .6px;
+        .cta{
+          margin-top:14px; width:100%;
+          border-radius:22px; border:4px solid var(--ink);
+          background:rgba(247,213,74,.75);
+          box-shadow:0 10px 0 rgba(0,0,0,.28);
+          padding:16px 12px; font-weight:1000; font-size:20px; letter-spacing:.5px; cursor:pointer;
         }
-        .buildBtn:disabled{ opacity:.6; cursor:not-allowed; }
-        .buildBtn:active{ transform: translateY(3px); box-shadow: 0 11px 0 rgba(0,0,0,.18); }
+        .cta:disabled{ opacity:.7; cursor:not-allowed; }
 
-        .loadingOverlay{
-          position: fixed;
-          inset: 0;
-          background: rgba(0,0,0,.72);
-          display:flex;
-          justify-content:center;
-          align-items:center;
-          z-index: 99999;
-          padding: 18px;
+        .ov{
+          position:fixed; inset:0; background:rgba(0,0,0,.55);
+          display:flex; align-items:center; justify-content:center; padding:18px; z-index:60;
         }
-        .loadingCard{
-          width: min(420px, 92vw);
-          background:#fff;
-          border: 8px solid #000;
-          border-radius: 28px;
-          box-shadow: 0 22px 70px rgba(0,0,0,.45);
-          padding: 16px;
-          text-align:center;
+        .ovCard{
+          width:min(420px, 100%);
+          background:#fff; border-radius:22px; border:4px solid var(--ink);
+          padding:18px 16px; box-shadow:0 12px 0 rgba(0,0,0,.35); text-align:center;
         }
-        .spinnerWrap{ display:flex; justify-content:center; margin-top: 4px; }
-        .spinner{
-          width: 62px; height: 62px;
-          border: 6px solid #000;
-          border-top-color: transparent;
-          border-radius: 999px;
-          animation: spin .9s linear infinite;
-          display:inline-block;
+        .spin{
+          width:54px; height:54px; border-radius:18px; border:4px solid var(--ink);
+          margin:0 auto 10px; display:flex; align-items:center; justify-content:center;
+          font-weight:1000; animation:rot 1s linear infinite; background:rgba(61,218,216,.25);
         }
-        @keyframes spin{ to { transform: rotate(360deg); } }
-        .loadingTitle{
-          margin-top: 10px;
-          font-weight: 1000;
-          letter-spacing: .6px;
-          text-transform: uppercase;
-        }
-        .loadingQuote{
-          margin-top: 10px;
-          font-weight: 1000;
-          font-size: 12px;
-          opacity:.85;
-          border: 4px solid #000;
-          border-radius: 18px;
-          padding: 10px 12px;
-          background:#fff;
-        }
+        @keyframes rot { to { transform:rotate(360deg);} }
+        .ovT{ font-weight:1000; font-size:16px; letter-spacing:.4px; }
+        .ovQ{ margin-top:8px; font-weight:900; font-size:13px; opacity:.8; }
 
-        /* MOBILE */
-        @media (max-width: 560px){
-          .wrap{ padding: 12px; }
-          .topRow{
-            flex-direction: column;
-            align-items: stretch;
-            gap: 10px;
-          }
-          .settingsBtn{ width: 100%; }
-          .pill{ font-size: 11px; padding: 9px 10px; }
-          .card{ padding: 14px; border-radius: 24px; }
-          .vibesLogo{ width: 150px; height: 150px; }
-          .grid2{ grid-template-columns: 1fr; }
-          .row2{ grid-template-columns: 1fr; }
-          .refBox{ min-height: 140px; }
-          .txt{ font-size: 12px; }
+        @media (max-width:380px){
+          .big{ font-size:30px; }
+          .sheet{ padding:14px 12px 12px; }
+          .choice{ padding:11px 10px; }
+          .fmtBtn{ padding:11px 8px; }
         }
-          .topActions{
-  display:flex;
-  gap:10px;
-  align-items:center;
-}
-
       `}</style>
     </div>
   );
