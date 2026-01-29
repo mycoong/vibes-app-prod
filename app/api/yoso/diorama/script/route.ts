@@ -11,7 +11,7 @@ function json(data: any, status = 200) {
 }
 
 /* =========================================================
-   Prompt builder (LOCKED narrative + image style)
+   PROMPT BUILDER — FINAL LOCK
 ========================================================= */
 function buildPrompt(input: {
   topic: string;
@@ -24,11 +24,11 @@ function buildPrompt(input: {
   const { topic, style, format, audience, genre, template } = input;
 
   return `
-You are a professional Indonesian short documentary scriptwriter.
+You are a professional Indonesian documentary storyteller and visual director.
 
 Return ONLY valid JSON. No markdown. No explanation.
 
-JSON format:
+JSON structure (MUST be exact):
 {
   "scenes": [
     {
@@ -42,54 +42,83 @@ JSON format:
   ]
 }
 
-HARD RULES (MANDATORY):
-- Must output EXACTLY 9 scenes.
-- Every field must be non-empty string.
-- All 9 narratives MUST form ONE continuous story (not separate thoughts).
-- Tone: Indonesian, tegas, natural, seperti storyteller dokumenter.
-- NO poetry. NO lebay. NO hyperbole. NO drama berlebihan.
-- NO fictional random names (no "Budi", no invented characters).
-- Content must feel like factual storytelling / factual narrative.
-- Total narrative length across all scenes: 100–140 words (≈35–50 sec VO).
-- Each scene narrative should feel like continuation, not standalone sentence.
+==============================
+NARRATIVE HARD RULES
+==============================
+- MUST output exactly 9 scenes.
+- All 9 narratives must form ONE continuous story (scene 2 continues scene 1, etc).
+- Language: Indonesian.
+- Tone: tegas, natural, seperti storyteller dokumenter.
+- Must feel like factual storytelling, not fiction, not poetry.
+- No hyperbole, no lebay, no pantun, no puitis.
+- NO fictional names (no Budi, no invented characters).
+- Total length across all scenes: 100–140 Indonesian words.
+- Scene 1 must contain strong hook.
+- Scene 9 must contain soft CTA (follow + comment), naturally embedded.
 
-CTA RULE (SCENE 9 ONLY):
-- Must include subtle CTA in last narrative:
-  - Invite to follow AND comment naturally.
-  - Example style: "Kalau kamu pernah dengar versi lain, tulis di komentar."
-  - No "part 2", no marketing tone, no pushy CTA.
+CTA rule:
+- Must be subtle and natural.
+- Must include BOTH actions: follow and comment.
+- No "part 2".
+- No marketing tone.
+- Example style (do NOT copy literally):
+  "Kalau kamu suka model cerita seperti ini, follow. Menurutmu bagian paling menarik yang mana? Tulis di komentar."
 
-IMAGE PROMPT LOCK (ENGLISH ONLY):
-Every imagePromptA and imagePromptB MUST strictly follow this style:
+==============================
+IMAGE PROMPT HARD LOCK
+==============================
+Every imagePromptA and imagePromptB MUST be English and MUST follow this style:
 
-CINEMATIC PHOTOREALISTIC MINIATURE DIORAMA STYLE:
-- photorealistic miniature world, ultra-detailed physical textures (moss, dirt, stone, cracked wood, fabric, water surface)
-- strong tilt-shift effect (hard depth of field, miniature illusion)
-- wide or medium-wide framing ONLY (no close-up, no portrait)
-- tiny human figures allowed ONLY if they appear small in environment
-- cinematic natural lighting, atmospheric haze, volumetric light
-- documentary photography look, not fantasy art, not illustration
+DOCUMENTARY MINIATURE REALIST STYLE:
+- photorealistic historical miniature diorama
+- documentary reconstruction photography
+- museum-quality handcrafted environment
+- ultra-detailed real textures: moss, mud, dust, cracked wood, worn stone, aged fabric, water surface, fog
+- cinematic lighting, volumetric light, atmospheric depth
+- strong tilt-shift lens effect (miniature illusion)
+- wide or medium-wide framing only
+- tiny human figures allowed ONLY if historically accurate and small in scale
+- historically accurate clothing, tools, environment
+- indigenous Southeast Asian environment when relevant
+- feels like professional miniature photography of a museum diorama
 
-STRICTLY FORBIDDEN in image:
+STRICTLY FORBIDDEN (must be implicitly banned in prompt):
 - no toy look
+- no clay figure
+- no doll aesthetic
 - no plastic look
-- no doll face
-- no visible base
-- no pedestal
+- no CGI render style
+- no illustration style
+- no anime/cartoon
+- no modern clothing
+- no modern objects
+- no smartphone
+- no glasses
+- no sneakers
+- no hoodie
+- no vehicles
+- no modern buildings
+- no electricity
+- no close-up portrait
+- no macro face
 - no stand
+- no base
+- no pedestal
+- no visible support
 - no human hands
-- no CGI render look
-- no close-up face
-- no portrait photography
-- no macro of faces
+- no studio background
 
-VIDEO PROMPT RULE:
+==============================
+VIDEO PROMPT RULE
+==============================
 - English
-- 1–2 sentences only
+- 1–2 sentences
 - Must describe cinematic camera movement (push-in, slow pan, crane, tracking, drift)
-- Must match the scene narrative
+- Must match the narrative and image scene
 
-CONTEXT:
+==============================
+CONTEXT
+==============================
 topic: ${topic}
 style: ${style}
 format: ${format}
@@ -102,7 +131,7 @@ Now generate the JSON.
 }
 
 /* =========================================================
-   Route
+   ROUTE
 ========================================================= */
 export async function POST(req: Request) {
   let body: any = {};
@@ -129,9 +158,6 @@ export async function POST(req: Request) {
     return json({ ok: false, error: "MISSING_FIELDS", missing }, 400);
   }
 
-  /* =====================================================
-     API Keys
-  ===================================================== */
   let keys: string[] = [];
 
   if (Array.isArray(body?.apiKeys)) {
@@ -153,15 +179,11 @@ export async function POST(req: Request) {
       {
         ok: false,
         error: "API_KEY_MISSING",
-        message: "apiKeys[] or apiKey1..apiKey5 must be provided",
       },
       400
     );
   }
 
-  /* =====================================================
-     Build Prompt
-  ===================================================== */
   const prompt = buildPrompt({
     topic,
     style,
@@ -171,10 +193,7 @@ export async function POST(req: Request) {
     template,
   });
 
-  const result = await callGeminiWithRotation({
-    keys,
-    prompt,
-  });
+  const result = await callGeminiWithRotation({ keys, prompt });
 
   if (!result.ok) {
     return json(
@@ -183,32 +202,20 @@ export async function POST(req: Request) {
     );
   }
 
-  /* =====================================================
-     Validate JSON
-  ===================================================== */
   const jsonData = result.json;
 
   if (!jsonData || typeof jsonData !== "object") {
-    return json(
-      { ok: false, error: "JSON_INVALID", raw: result.text?.slice(0, 2000) },
-      500
-    );
+    return json({ ok: false, error: "JSON_INVALID" }, 500);
   }
 
   const scenes = jsonData?.scenes;
 
   if (!Array.isArray(scenes)) {
-    return json(
-      { ok: false, error: "SCENES_NOT_ARRAY", raw: jsonData },
-      500
-    );
+    return json({ ok: false, error: "SCENES_NOT_ARRAY" }, 500);
   }
 
   if (scenes.length !== 9) {
-    return json(
-      { ok: false, error: "SCENES_COUNT_INVALID", count: scenes.length },
-      500
-    );
+    return json({ ok: false, error: "SCENES_COUNT_INVALID", count: scenes.length }, 500);
   }
 
   for (const [i, s] of scenes.entries()) {
@@ -220,10 +227,7 @@ export async function POST(req: Request) {
       typeof s.imagePromptB !== "string" ||
       typeof s.videoPrompt !== "string"
     ) {
-      return json(
-        { ok: false, error: "SCENE_FIELD_INVALID", index: i },
-        500
-      );
+      return json({ ok: false, error: "SCENE_FIELD_INVALID", index: i }, 500);
     }
   }
 
