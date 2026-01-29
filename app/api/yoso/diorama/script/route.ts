@@ -24,8 +24,7 @@ function buildPrompt(input: {
   const { topic, style, format, audience, genre, template } = input;
 
   return `
-You are "AI Studio Script Generator" for Vibes App (YosoApp legacy).
-
+You are "Vibes App Script Generator".
 Return ONLY valid JSON. No markdown. No explanations. No code fences.
 
 The JSON structure MUST be:
@@ -42,45 +41,58 @@ The JSON structure MUST be:
   ]
 }
 
-HARD RULES (MUST FOLLOW):
-- Total scenes MUST be exactly 9.
-- Every field must exist and be non-empty string.
-- Output MUST feel like ONE connected story across 9 scenes (scene-1 -> scene-9).
-- Narrative language: Indonesian, natural storytelling, not poetic, not pantun, not lebay.
-- TOTAL narration across 9 scenes MUST be 85–120 Indonesian words (target 35–50 seconds voiceover).
-- Scene-1 MUST be a high-hook opener (12–22 words). Make people instantly curious.
-- Scene-2..Scene-8 MUST be short story beats (8–14 words each). Keep it direct.
-- Scene-9 MUST contain a CTA at the END ONLY (HARD RULE):
-  - Must include BOTH: "follow" and "komen"
-  - CTA must be 10–18 words, natural, not salesy.
-  - CTA MUST NOT appear in scene-1..scene-8.
+HARD RULES (NON-NEGOTIABLE):
+1) Total scenes MUST be exactly 9.
+2) Every field must exist and be non-empty string.
+3) Language:
+   - narrative: Indonesian, conversational storytelling (seperti lagi cerita), NO puitis, NO pantun, NO kata-kata lebay, NO metafora berlebihan.
+   - Keep it natural, berbobot, dan jelas (apa yang terjadi, siapa, di mana, kenapa).
+4) Timing target:
+   - Total narrative untuk 9 scenes harus kira-kira 35–50 detik voice-over.
+   - Guideline: tiap scene 1–2 kalimat pendek (±8–14 kata per kalimat).
+   - Jangan kepanjangan. Jangan juga potongan super pendek yang kaku.
+5) Hook:
+   - Scene-1 WAJIB punya hook kuat di kalimat pertama (bikin orang berhenti scroll).
+6) Story flow:
+   - Scene 1–8 harus nyambung sebagai satu cerita utuh (ada progression / eskalasi).
+   - Scene-9 harus jadi penutup yang rapih (wrap-up / punchline ringan).
+7) CTA HARD RULE (WAJIB dan HARUS di Scene-9 narrative, di baris terakhir):
+   - Tambahkan 1 kalimat CTA yang NATURAL (bukan lebay) persis mengandung kata "follow" dan "komen".
+   - Format CTA wajib:
+     "Kalau kamu mau lanjut part berikutnya, follow dan komen: MAU PART 2."
+   - CTA TIDAK BOLEH muncul di Scene 1–8. HANYA di Scene-9.
+8) Image prompts:
+   - imagePromptA/B: ENGLISH, cinematic historical miniature diorama, NOT toy photo, NOT plastic, NOT product shot.
+   - MUST be WIDE establishing shot (full scene), NO close-up portrait, NO macro portrait of faces.
+   - Must look like a real film set photographed with a tilt-shift lens: HARD tilt-shift, very shallow depth of field, strong bokeh, cinematic lighting.
+   - Physical realism: visible textures (dust, patina, scratches, cloth fibers, wood grain, chipped paint, mud, stone, rain sheen).
+   - Crowded tiny figures are allowed, but must NOT look like figurines.
+   - STRICT NEGATIVE: NO display base, NO stands under feet, NO support rods, NO transparent supports, NO doll joints, NO plastic shine, NO toy-like proportions, NO CGI, NO 3D render, NO studio backdrop, NO watermark, NO text.
+9) Consistency:
+   - A = Setup (kejadian & konteks).
+   - B = Klimaks (konflik/aksi puncak).
+10) videoPrompt:
+   - ENGLISH, 1–2 sentences, cinematic camera movement (push-in, tracking, crane).
+   - Keep it wide/establishing; avoid close-ups.
 
-IMAGE PROMPT HARD RULES (WHISK READY):
-- imagePromptA/B MUST be ENGLISH.
-- Style MUST be: cinematic miniature diorama that looks REAL (not toy-looking).
-- ALWAYS WIDE / ESTABLISHING DIORAMA SHOT: full set visible, tiny figures visible head-to-toe.
-- FORBIDDEN: close-up portraits, face closeup, extreme closeup, headshot, tight framing, single-person close-up, macro portrait.
-- MUST include strong tilt-shift look with a very shallow focus plane, heavy bokeh, miniature scale illusion.
-- MUST look like a handcrafted physical set with authentic materials: weathered wood, cloth fibers, dust, patina, scratches, chipped paint, mud, stone grains.
-- MUST NOT show toy stands, support rods, display bases, transparent supports, foot stands, doll joints, plastic shine, action-figure seams.
-- MUST NOT look like CGI / 3D render / game asset.
-- Lighting: cinematic, moody documentary lighting, volumetric haze optional, realistic shadows.
-- Composition: wide diorama table/set perspective, small human figures, environment tells the story.
-
-GLOBAL DIORAMA LOCK (append to EVERY imagePromptA/B, word-for-word):
-"PHYSICAL MINIATURE DIORAMA SET, WIDE ESTABLISHING SHOT, tiny full-body figures, handcrafted realism, no close-up portrait, no face closeup, no extreme closeup, strong tilt-shift lens effect, very shallow focus plane, heavy bokeh, miniature scale illusion, cinematic documentary lighting, realistic materials (dust, scratches, patina, cloth fibers, wood grain, chipped paint, mud), NOT CGI, NOT 3D render, NOT toy, no plastic shine, no doll joints, no stands, no support rods, no display base, no text, no watermark"
-
-VIDEO PROMPT RULES:
-- videoPrompt MUST be ENGLISH, 1 sentence only, cinematic camera move.
-- Match the same "wide diorama establishing" constraint (no close-ups).
-
-Context:
+CONTEXT:
 topic: ${topic}
 style: ${style}
 format: ${format}
 audience: ${audience}
 genre: ${genre}
 template: ${template}
+
+SCENE BLUEPRINT (FOLLOW THIS):
+- Scene-1: hook + situasi awal (langsung "kejadian aneh/tegang/menegangkan" yang bikin penasaran)
+- Scene-2: siapa yang terlibat + tujuan/misi
+- Scene-3: tanda bahaya/jejak
+- Scene-4: tekanan naik (waktu mepet / risiko)
+- Scene-5: keputusan sulit
+- Scene-6: aksi berjalan
+- Scene-7: hampir gagal
+- Scene-8: twist / fakta penting
+- Scene-9: penutup + CTA wajib
 
 Now output JSON only.
 `.trim();
@@ -192,7 +204,12 @@ export async function POST(req: Request) {
 
   if (scenes.length !== 9) {
     return json(
-      { ok: false, error: "SCENES_COUNT_INVALID", count: scenes.length, raw: jsonData },
+      {
+        ok: false,
+        error: "SCENES_COUNT_INVALID",
+        count: scenes.length,
+        raw: jsonData,
+      },
       500
     );
   }
@@ -206,8 +223,37 @@ export async function POST(req: Request) {
       typeof s.imagePromptB !== "string" ||
       typeof s.videoPrompt !== "string"
     ) {
-      return json({ ok: false, error: "SCENE_FIELD_INVALID", index: i, raw: s }, 500);
+      return json(
+        { ok: false, error: "SCENE_FIELD_INVALID", index: i, raw: s },
+        500
+      );
     }
+    if (!String(s.id).trim() || !String(s.narrative).trim() || !String(s.imagePromptA).trim() || !String(s.imagePromptB).trim() || !String(s.videoPrompt).trim()) {
+      return json(
+        { ok: false, error: "SCENE_FIELD_EMPTY", index: i, raw: s },
+        500
+      );
+    }
+  }
+
+  // CTA HARD VALIDATION: must exist ONLY in scene-9, last line, with follow + komen
+  const ctaLine = "Kalau kamu mau lanjut part berikutnya, follow dan komen: MAU PART 2.";
+  const narratives = scenes.map((s: any) => String(s.narrative || ""));
+  const hasCTAIn1to8 = narratives.slice(0, 8).some((t: string) => t.includes("follow") || t.includes("komen") || t.includes("MAU PART 2"));
+  const lastNarr = narratives[8] || "";
+  const lastLine = lastNarr.trim().split("\n").filter(Boolean).slice(-1)[0] || "";
+
+  if (hasCTAIn1to8) {
+    return json(
+      { ok: false, error: "CTA_RULE_VIOLATION", message: "CTA must NOT appear in scenes 1–8." },
+      500
+    );
+  }
+  if (lastLine.trim() !== ctaLine) {
+    return json(
+      { ok: false, error: "CTA_MISSING_OR_INVALID", expectedLastLine: ctaLine, gotLastLine: lastLine },
+      500
+    );
   }
 
   /* =====================================================
