@@ -6,6 +6,8 @@ const LS_KEYS = {
   SLOTS: "YOSO_API_KEY_SLOTS",
   IDEA_META: "YOSO_IDEA_META",
   REF_IMAGE: "YOSO_REF_IMAGE_DATAURL",
+  REF_ATMO: "YOSO_REF_ATMO_DATAURL",
+  REF_LIGHT: "YOSO_REF_LIGHT_DATAURL",
   WHISK_TOKEN: "YOSO_WHISK_TOKEN",
   WHISK_REF: "YOSO_WHISK_REF",
 };
@@ -61,6 +63,34 @@ function readRefImage(): string {
 function writeRefImage(dataUrl: string) {
   try {
     localStorage.setItem(LS_KEYS.REF_IMAGE, dataUrl || "");
+  } catch {}
+}
+
+function readRefAtmoImage(): string {
+  try {
+    return String(localStorage.getItem(LS_KEYS.REF_ATMO) || "");
+  } catch {
+    return "";
+  }
+}
+
+function writeRefAtmoImage(dataUrl: string) {
+  try {
+    localStorage.setItem(LS_KEYS.REF_ATMO, dataUrl || "");
+  } catch {}
+}
+
+function readRefLightImage(): string {
+  try {
+    return String(localStorage.getItem(LS_KEYS.REF_LIGHT) || "");
+  } catch {
+    return "";
+  }
+}
+
+function writeRefLightImage(dataUrl: string) {
+  try {
+    localStorage.setItem(LS_KEYS.REF_LIGHT, dataUrl || "");
   } catch {}
 }
 
@@ -122,6 +152,8 @@ export default function BuilderIdeaPage() {
   const [format, setFormat] = useState("SHORT");
   const [topic, setTopic] = useState("");
   const [refImage, setRefImage] = useState<string>("");
+  const [refAtmoImage, setRefAtmoImage] = useState<string>("");
+  const [refLightImage, setRefLightImage] = useState<string>("");
   const [apiCount, setApiCount] = useState(0);
   const [isSearching, setIsSearching] = useState(false);
   const [isBuilding, setIsBuilding] = useState(false);
@@ -134,6 +166,8 @@ export default function BuilderIdeaPage() {
     setMounted(true);
     setApiCount(getAllApiKeysFromStorage().length);
     setRefImage(readRefImage());
+    setRefAtmoImage(readRefAtmoImage());
+    setRefLightImage(readRefLightImage());
     readWhiskRef(); // keep side effects compatibility
     try {
       const raw = localStorage.getItem(LS_KEYS.IDEA_META);
@@ -276,6 +310,44 @@ export default function BuilderIdeaPage() {
     setMsg("REF_IMAGE_CLEARED");
   }
 
+async function onPickRefAtmoImage(file: File | null) {
+  if (!mounted) return;
+  if (!file) return;
+  try {
+    const dataUrl = await fileToDataUrl(file);
+    setRefAtmoImage(dataUrl);
+    writeRefAtmoImage(dataUrl);
+    setMsg("REF_ATMO_OK ✅");
+  } catch {
+    setMsg("REF_ATMO_GAGAL");
+  }
+}
+
+function onClearRefAtmoImage() {
+  setRefAtmoImage("");
+  writeRefAtmoImage("");
+  setMsg("REF_ATMO_CLEARED");
+}
+
+async function onPickRefLightImage(file: File | null) {
+  if (!mounted) return;
+  if (!file) return;
+  try {
+    const dataUrl = await fileToDataUrl(file);
+    setRefLightImage(dataUrl);
+    writeRefLightImage(dataUrl);
+    setMsg("REF_LIGHT_OK ✅");
+  } catch {
+    setMsg("REF_LIGHT_GAGAL");
+  }
+}
+
+function onClearRefLightImage() {
+  setRefLightImage("");
+  writeRefLightImage("");
+  setMsg("REF_LIGHT_CLEARED");
+}
+
   async function onBuild() {
     if (!mounted) return;
     const t = String(topic || "").trim();
@@ -343,7 +415,8 @@ export default function BuilderIdeaPage() {
   return (
     <div className="pg">
       <div className="hdr">
-        <div className="hdrLeft">
+        <div className="hdrInner">
+          <div className="hdrLeft">
           <div className="hdrIcon" aria-hidden="true">🌀</div>
           <div className="hdrTitle">NUSANTARA DIORAMA AI</div>
         </div>
@@ -359,6 +432,7 @@ export default function BuilderIdeaPage() {
           <button className="hdrBtn" type="button" onClick={() => (window.location.href = "/settings")} title="Settings">
             ⚙️
           </button>
+        </div>
         </div>
       </div>
 
@@ -428,40 +502,85 @@ export default function BuilderIdeaPage() {
                   );
                 })}
               </div>
+  </div>
 
-              <div className="refWrap">
-                <label className={`refCard ${refImage ? "hasImg" : ""}`}>
-                  <input
-                    className="refInput"
-                    type="file"
-                    accept="image/*"
-                    onChange={(e) => onPickRefImage(e.target.files?.[0] || null)}
-                  />
-                  {refImage ? (
-                    <img className="refImg" src={refImage} alt="Ref" />
-                  ) : (
-                    <div className="refEmpty">
-                      <div className="refUp" aria-hidden="true">⬆️</div>
-                      <div className="refTxt">REF IMAGE</div>
-                      <div className="refHint">tap untuk upload</div>
-                    </div>
-                  )}
-                </label>
+  <div className="refMiniStack">
+    <div className="refMiniTitle">REF IMAGE (MASTER STYLE)</div>
 
-                {refImage ? (
-                  <button className="refX" type="button" onClick={onClearRefImage} title="Clear ref">
-                    ✖
-                  </button>
-                ) : null}
+    <div className="refMiniRow">
+      <div className="refMiniLabel">Atmosphere</div>
+      <div className="refMiniBox">
+        <label className={`refMiniCard ${refAtmoImage ? "hasImg" : ""}`}>
+          <input
+            className="refInput"
+            type="file"
+            accept="image/*"
+            onChange={(e) => onPickRefAtmoImage(e.target.files?.[0] || null)}
+          />
+          {refAtmoImage ? (
+            <img className="refMiniImg" src={refAtmoImage} alt="Atmosphere" />
+          ) : (
+            <div className="refMiniEmpty">Upload</div>
+          )}
+        </label>
+        {refAtmoImage ? (
+          <button className="refMiniX" type="button" onClick={onClearRefAtmoImage} title="Clear atmosphere">
+            ✖
+          </button>
+        ) : null}
+      </div>
+    </div>
 
-                {isWhiskUploading ? <div className="refUploading">Uploading…</div> : null}
-              </div>
-            </div>
-          </div>
+    <div className="refMiniRow">
+      <div className="refMiniLabel">Subject</div>
+      <div className="refMiniBox">
+        <label className={`refMiniCard ${refImage ? "hasImg" : ""}`}>
+          <input
+            className="refInput"
+            type="file"
+            accept="image/*"
+            onChange={(e) => onPickRefImage(e.target.files?.[0] || null)}
+          />
+          {refImage ? <img className="refMiniImg" src={refImage} alt="Subject" /> : <div className="refMiniEmpty">Upload</div>}
+        </label>
+        {refImage ? (
+          <button className="refMiniX" type="button" onClick={onClearRefImage} title="Clear subject">
+            ✖
+          </button>
+        ) : null}
+        {isWhiskUploading ? <div className="refMiniUploading">Uploading…</div> : null}
+      </div>
+    </div>
 
-          <div className="sec">
-            <div className="secHead">
-              <div className="tag tagCyan">3. TENTUKAN KISAH</div>
+    <div className="refMiniRow">
+      <div className="refMiniLabel">Lighting + Style</div>
+      <div className="refMiniBox">
+        <label className={`refMiniCard ${refLightImage ? "hasImg" : ""}`}>
+          <input
+            className="refInput"
+            type="file"
+            accept="image/*"
+            onChange={(e) => onPickRefLightImage(e.target.files?.[0] || null)}
+          />
+          {refLightImage ? (
+            <img className="refMiniImg" src={refLightImage} alt="Lighting and style" />
+          ) : (
+            <div className="refMiniEmpty">Upload</div>
+          )}
+        </label>
+        {refLightImage ? (
+          <button className="refMiniX" type="button" onClick={onClearRefLightImage} title="Clear lighting/style">
+            ✖
+          </button>
+        ) : null}
+      </div>
+    </div>
+  </div>
+</div>
+
+<div className="sec">
+  <div className="secHead">
+    <div className="tag tagCyan">3. TENTUKAN KISAH</div>
               <button className="zap" type="button" onClick={onPickRandomTopic} disabled={!mounted || isSearching}>
                 ⚡ {isSearching ? "MENCARI..." : "CARI TOPIK (SEJARAH)"}
               </button>
@@ -511,8 +630,18 @@ export default function BuilderIdeaPage() {
 
         .hdr{
           position:sticky; top:0; z-index:20;
+          display:flex; justify-content:center;
+          padding:10px 14px;
+          background:transparent;
+        }
+        .hdrInner{
+          width:min(520px, 100%);
           display:flex; align-items:center; justify-content:space-between; gap:12px;
-          padding:12px 14px; background:var(--yellow); border-bottom:4px solid var(--ink);
+          padding:12px 14px;
+          background:var(--yellow);
+          border:4px solid var(--ink);
+          border-radius:18px;
+          box-shadow:0 8px 0 rgba(0,0,0,.25);
         }
         .hdrLeft{ display:flex; align-items:center; gap:10px; min-width:0; }
         .hdrIcon{
@@ -575,7 +704,8 @@ export default function BuilderIdeaPage() {
         .choice .lbl{ font-weight:950; font-size:13px; letter-spacing:.2px; }
         .choice.active{ background:rgba(247,213,74,.9); }
 
-        .formatRow{ display:grid; grid-template-columns:1fr 1fr; gap:10px; align-items:stretch; }
+        .formatRow{ display:flex; gap:10px; align-items:stretch; }
+        .formatRow .fmtBtns{ flex:1; }
         .fmtBtns{ display:flex; gap:10px; }
         .fmtBtn{
           flex:1; border-radius:14px; border:4px solid var(--ink); background:#fff;
@@ -584,7 +714,81 @@ export default function BuilderIdeaPage() {
         }
         .fmtBtn.fmtOn{ background:rgba(247,213,74,.9); }
 
-        .refWrap{ position:relative; width:100%; }
+        .refMiniStack{
+  margin-top:10px;
+  border-radius:16px;
+  border:4px solid var(--ink);
+  background:#fff;
+  box-shadow:0 8px 0 rgba(0,0,0,.18);
+  padding:10px;
+}
+.refMiniTitle{
+  font-weight:1000;
+  font-size:12px;
+  opacity:.85;
+  margin-bottom:8px;
+  letter-spacing:.4px;
+  text-transform:uppercase;
+}
+.refMiniRow{
+  display:grid;
+  grid-template-columns: 118px 1fr;
+  gap:10px;
+  align-items:center;
+  margin-bottom:8px;
+}
+.refMiniRow:last-child{ margin-bottom:0; }
+.refMiniLabel{
+  font-weight:1000;
+  font-size:12px;
+  padding:8px 10px;
+  border-radius:12px;
+  border:3px solid var(--ink);
+  background:rgba(0,0,0,.04);
+}
+.refMiniBox{ position:relative; }
+.refMiniCard{
+  width:100%;
+  height:56px;
+  border-radius:12px;
+  border:3px dashed var(--ink);
+  background:rgba(0,0,0,.02);
+  display:flex; align-items:center; justify-content:center;
+  overflow:hidden;
+  cursor:pointer;
+}
+.refMiniCard.hasImg{ border-style:solid; background:#fff; }
+.refMiniImg{ width:100%; height:100%; object-fit:cover; display:block; }
+.refMiniEmpty{ font-weight:1000; font-size:12px; opacity:.75; }
+.refMiniX{
+  position:absolute;
+  top:-10px; right:-10px;
+  width:28px; height:28px;
+  border-radius:999px;
+  border:3px solid var(--ink);
+  background:#fff;
+  font-weight:1000;
+  cursor:pointer;
+}
+.refMiniUploading{
+  position:absolute;
+  left:10px;
+  top:50%;
+  transform:translateY(-50%);
+  font-size:11px;
+  font-weight:1000;
+  padding:4px 8px;
+  border-radius:999px;
+  border:3px solid var(--ink);
+  background:rgba(247,213,74,.95);
+}
+
+@media (max-width: 520px){
+  .refMiniRow{ grid-template-columns: 98px 1fr; }
+  .refMiniCard{ height:52px; }
+}
+
+.refWrap{ position:relative; width:100%; }
         .refCard{
           width:100%; height:100%;
           border-radius:14px; border:3px dashed var(--ink);

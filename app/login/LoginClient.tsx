@@ -21,6 +21,7 @@ export default function LoginClient() {
   const [license, setLicense] = useState("");
   const [device, setDevice] = useState("");
   const [loading, setLoading] = useState(false);
+  const [pressed, setPressed] = useState(false);
   const [err, setErr] = useState<string | null>(null);
 
   useEffect(() => {
@@ -35,6 +36,8 @@ export default function LoginClient() {
 
   async function onSubmit(e: React.FormEvent) {
     e.preventDefault();
+    if (loading) return;
+
     setErr(null);
     setLoading(true);
 
@@ -60,115 +63,219 @@ export default function LoginClient() {
     }
   }
 
+  function pressNow() {
+    setPressed(true);
+    window.setTimeout(() => setPressed(false), 140);
+  }
 
   return (
-    <div className="wrap">
-      <div className="card">
-        <div className="brand">
-          <img src="/vibes-logo.png" alt="Vibes App" className="logo" />
-          <div className="slogan">Moments that take you there.</div>
-        </div>
-
-        <form onSubmit={onSubmit} className="form">
-          <div className="field">
-            <label>License Key</label>
+    <div className="bg">
+      <div className="outer">
+        <div className="sheet">
+          <form onSubmit={onSubmit} className="stack">
             <input
+              className="passkey"
               value={license}
               onChange={(e) => setLicense(e.target.value)}
-              placeholder="ENTER YOUR LICENSE"
+              placeholder="Masukkan passkey"
+              required
             />
-          </div>
 
-          <button disabled={loading}>
-            {loading ? "PLEASE WAIT..." : "LOGIN"}
-          </button>
+            <button
+              type="submit"
+              className={
+                "login" +
+                (pressed ? " isPressed" : "") +
+                (loading ? " isLoading" : "")
+              }
+              onPointerDown={pressNow}
+              onClick={pressNow}
+              disabled={loading}
+            >
+              <span className="btnInner">
+                <span className="btnIcon" aria-hidden="true">
+                  <svg viewBox="0 0 24 24" width="18" height="18">
+                    <path
+                      fill="currentColor"
+                      d="M10 17l1.41-1.41L8.83 13H20v-2H8.83l2.58-2.59L10 7l-7 7 7 7z"
+                    />
+                  </svg>
+                </span>
+                <span className="btnText">{loading ? "Checking..." : "Login"}</span>
+              </span>
 
-          {device && <div className="device">DEVICE: {device}</div>}
-          {err && <div className="error">ERROR: {err}</div>}
-        </form>
+              {/* visible spinner ring when loading */}
+              <span className="spinner" aria-hidden="true" />
 
-        <a href="https://t.me/VibesTheApp" target="_blank" className="telegram" aria-label="Telegram">
-          <svg viewBox="0 0 240 240" width="22" height="22" aria-hidden="true">
-            <path fill="currentColor" d="M120 0C53.7 0 0 53.7 0 120s53.7 120 120 120 120-53.7 120-120S186.3 0 120 0zm58.2 82.3l-22.4 105.6c-1.7 7.5-6.2 9.4-12.5 5.9l-34.6-25.5-16.7 16.1c-1.8 1.8-3.3 3.3-6.7 3.3l2.4-34.9 63.6-57.4c2.8-2.4-.6-3.7-4.3-1.3l-78.6 49.5-33.8-10.6c-7.3-2.3-7.5-7.3 1.5-10.8l132-50.9c6.1-2.2 11.4 1.5 9.4 11z"/>
-          </svg>
-        </a>
+              {/* pulse overlay */}
+              <span className="btnPulse" aria-hidden="true" />
+            </button>
+
+            <a
+              className="tg"
+              href="https://t.me/VibesTheApp"
+              target="_blank"
+              rel="noreferrer"
+              aria-label="Telegram"
+              title="Telegram"
+            >
+              <svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true">
+                <path
+                  fill="currentColor"
+                  d="M9.04 15.92l-.39 5.52c.56 0 .8-.24 1.09-.53l2.61-2.5 5.41 3.95c.99.55 1.69.26 1.95-.91L23.3 3.58c.33-1.47-.53-2.05-1.49-1.69L1.66 9.67c-1.43.55-1.41 1.33-.25 1.69l5.17 1.61L18.6 5.64c.57-.35 1.09-.16.66.2L9.04 15.92z"
+                />
+              </svg>
+            </a>
+
+            {err && <div className="err">ERROR: {err}</div>}
+
+            <div className="dev" aria-hidden="true">
+              {maskedDevice}
+            </div>
+          </form>
+        </div>
       </div>
 
       <style>{`
-        .wrap {
+        .bg {
           min-height: 100vh;
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          background-image: url('/login-bg.png');
-          background-size: cover;
-          background-position: center;
-          background-repeat: no-repeat;
-          position: relative;
-          overflow: hidden;
-          padding: 24px;
-          font-family: ui-rounded, "Trebuchet MS", system-ui, sans-serif;
+          display: grid;
+          place-items: center;
+          background: url('/login-bg.png') center / cover no-repeat;
         }
 
-        .wrap::before {
-          content: "";
-          position: absolute;
-          inset: 0;
-          background: linear-gradient(180deg, rgba(0,0,0,.65), rgba(0,0,0,.75));
-          pointer-events: none;
+        .sheet {
+          background: transparent !important;
+          border: none !important;
+          box-shadow: none !important;
+          padding: 0 !important;
+          backdrop-filter: none !important;
         }
 
-        .card {
-          width: 100%;
-          max-width: 440px;
-          background: rgba(8,10,22,.75);
-          border: 2px solid rgba(255,255,255,.08);
-          border-radius: 28px;
-          backdrop-filter: blur(10px);
-          box-shadow: 0 30px 80px rgba(0,0,0,.6);
-          padding: 28px;
+        .stack {
           display: flex;
           flex-direction: column;
-          gap: 22px;
+          align-items: center;
+          gap: 14px;
+        }
+
+        /* 75% WIDTH */
+        .passkey,
+        .login {
+          width: min(270px, 65vw);
+        }
+
+        .passkey {
+          height: 44px;
+          border-radius: 10px;
+          border: 1px solid #ccc;
+          padding: 0 14px;
+          font-size: 16px;
+        }
+
+        .login {
           position: relative;
-        }
-
-        .brand { text-align: center; }
-        .logo { height: 110px; margin: 0 auto 6px; display: block; }
-        .slogan { font-weight: 900; font-size: 12px; letter-spacing: .14em; opacity: .8; text-transform: uppercase; }
-
-        .form { display: flex; flex-direction: column; gap: 14px; }
-        label { font-size: 12px; font-weight: 900; opacity: .85; }
-
-        input {
-          background: rgba(0,0,0,.4);
-          border: 1.5px solid rgba(255,255,255,.12);
-          border-radius: 16px;
-          padding: 12px 14px;
-          color: #fff;
-          font-size: 14px;
-          outline: none;
-        }
-
-        button {
-          margin-top: 4px;
-          background: linear-gradient(135deg, #6ea2ff, #a77bff);
+          overflow: hidden;
+          height: 48px;
+          border-radius: 10px;
           border: none;
-          border-radius: 16px;
-          padding: 12px;
-          font-weight: 1000;
+          background: #28a745;
+          color: white;
+          font-weight: 800;
           cursor: pointer;
+
+          box-shadow: 0 12px 26px rgba(0,0,0,.25);
+          transition: transform 140ms ease, filter 140ms ease, box-shadow 160ms ease;
         }
 
-        .telegram {
+        /* pressed feedback ALWAYS (even if click is fast) */
+        .login.isPressed,
+        .login:active {
+          transform: translateY(2px) scale(0.985);
+          filter: brightness(0.95);
+          box-shadow: 0 6px 14px rgba(0,0,0,.22);
+        }
+
+        .login:disabled {
+          opacity: 0.82;
+          cursor: not-allowed;
+        }
+
+        .btnInner{
+          position: relative;
+          z-index: 3;
+          height: 100%;
+          display: inline-flex;
+          align-items: center;
+          justify-content: center;
+          gap: 10px;
+        }
+        .btnIcon{ display:inline-flex; align-items:center; justify-content:center; }
+        .btnText{ letter-spacing: .02em; }
+
+        /* spinner on the right when loading */
+        .spinner{
+          position:absolute;
+          right: 12px;
+          top: 50%;
+          width: 16px;
+          height: 16px;
+          margin-top: -8px;
+          border-radius: 999px;
+          border: 2px solid rgba(255,255,255,.35);
+          border-top-color: rgba(255,255,255,1);
+          opacity: 0;
+          z-index: 4;
+        }
+        .login.isLoading .spinner{
+          opacity: 1;
+          animation: spin 800ms linear infinite;
+        }
+        @keyframes spin { to { transform: rotate(360deg); } }
+
+        /* subtle pulse overlay when loading */
+        .btnPulse{
           position: absolute;
-          top: 16px;
-          right: 16px;
-          color: rgba(255,255,255,.6);
+          inset: 0;
+          z-index: 2;
+          opacity: 0;
+          background: radial-gradient(60% 120% at 50% 50%, rgba(255,255,255,.22), rgba(255,255,255,0));
+          transform: scale(0.98);
+        }
+        .login.isLoading .btnPulse{
+          opacity: 1;
+          animation: pulse 900ms ease-in-out infinite;
+        }
+        @keyframes pulse{
+          0%{ transform: scale(0.98); opacity: .45; }
+          50%{ transform: scale(1.02); opacity: .8; }
+          100%{ transform: scale(0.98); opacity: .45; }
         }
 
-        .device { font-size: 11px; opacity: .6; }
-        .error { background: #3b0b0b; border-radius: 14px; padding: 10px; font-size: 12px; }
+        .tg {
+          width: 52px;
+          height: 52px;
+          border-radius: 12px;
+          display: grid;
+          place-items: center;
+          background: #2AABEE;
+          color: white;
+          text-decoration: none;
+          transition: transform 110ms ease, filter 110ms ease;
+        }
+        .tg:active{
+          transform: translateY(2px) scale(0.985);
+          filter: brightness(0.96);
+        }
+
+        .err {
+          color: white;
+          background: #b91c1c;
+          padding: 8px 12px;
+          border-radius: 8px;
+        }
+
+        .dev{ display:none; }
       `}</style>
     </div>
   );
