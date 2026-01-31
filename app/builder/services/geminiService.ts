@@ -9,29 +9,24 @@ const wait = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 function statusOf(err: any) {
   return err?.status ?? err?.code ?? err?.response?.status ?? null;
 }
-
 function msgOf(err: any) {
   return String(err?.message || err || "");
 }
-
 function isRateLimit(err: any) {
   const s = statusOf(err);
   const m = msgOf(err);
   return s === 429 || /\b429\b/.test(m) || /RESOURCE_EXHAUSTED|quota|rate limit/i.test(m);
 }
-
 function isAuthInvalid(err: any) {
   const s = statusOf(err);
   const m = msgOf(err);
   return s === 401 || s === 403 || /invalid api key|api key not valid|permission denied/i.test(m);
 }
-
 function isTransient(err: any) {
   const s = statusOf(err);
   const m = msgOf(err);
   return s === 500 || s === 503 || /timeout|timed out|fetch failed|ECONNRESET/i.test(m);
 }
-
 function shortErr(err: any) {
   const s = statusOf(err);
   const m = msgOf(err).split("\n")[0].slice(0, 180);
@@ -68,24 +63,18 @@ async function withRotatingApiKey<T>(task: (ai: GoogleGenAI) => Promise<T>): Pro
       lastErr = err;
 
       if (isRateLimit(err)) {
-        // anti 429: cooldown 2 menit, lalu coba key berikutnya
         markCooldown(slot.id, 2 * 60 * 1000, "429");
         continue;
       }
-
       if (isAuthInvalid(err)) {
-        // invalid: cooldown lama supaya tidak dipakai terus
         markCooldown(slot.id, 30 * 60 * 1000, "INVALID");
         continue;
       }
-
       if (isTransient(err)) {
-        // error sementara: cooldown pendek
         markCooldown(slot.id, 20 * 1000, "TEMP");
         continue;
       }
 
-      // error lain: jangan muter, bubble up
       throw err;
     }
   }
@@ -128,14 +117,13 @@ DILARANG:
 `;
 
 const STYLE_PROMPTS: Record<VideoStyle, string> = {
-  ERA_KOLONIAL: `Indonesian Colonial Era (Hindia Belanda). Fokus pada kanal lama Batavia, arsitektur VOC lapuk, pelabuhan ramai, and infrastruktur masif. ${MASTER_VISUAL_LOCK}`,
-  SEJARAH_PERJUANGAN: `Indonesian Independence Struggle. Fokus pada taktik gerilya, hutan tropis lembap, bambu runcing, reruntuhan batu berlumut, and kerumunan warga. ${MASTER_VISUAL_LOCK}`,
-  LEGENDA_RAKYAT: `Indonesian Folklore. Fokus pada lanskap mistis nusantara, desa tradisional terpencil, and elemen mistis yang terasa sebagai miniatur fisik nyata. ${MASTER_VISUAL_LOCK}`,
-  BUDAYA_NUSANTARA: `Indonesian Cultural Heritage. Fokus pada upacara adat kolosal, pasar tradisional ramai, rumah Joglo/Gadang, and detail kostum tradisional. ${MASTER_VISUAL_LOCK}`,
+  ERA_KOLONIAL: `Indonesian Colonial Era (Hindia Belanda). Fokus pada kanal lama Batavia, arsitektur VOC lapuk, pelabuhan ramai, dan infrastruktur masif. ${MASTER_VISUAL_LOCK}`,
+  SEJARAH_PERJUANGAN: `Indonesian Independence Struggle. Fokus pada taktik gerilya, hutan tropis lembap, bambu runcing, reruntuhan batu berlumut, dan kerumunan warga. ${MASTER_VISUAL_LOCK}`,
+  LEGENDA_RAKYAT: `Indonesian Folklore. Fokus pada lanskap mistis nusantara, desa tradisional terpencil, dan elemen mistis yang terasa sebagai miniatur fisik nyata. ${MASTER_VISUAL_LOCK}`,
+  BUDAYA_NUSANTARA: `Indonesian Cultural Heritage. Fokus pada upacara adat kolosal, pasar tradisional ramai, rumah Joglo/Gadang, dan detail kostum tradisional. ${MASTER_VISUAL_LOCK}`,
 };
 
 async function retryApiCall<T>(apiCall: () => Promise<T>, retries: number = 2, initialDelay: number = 1200): Promise<T> {
-  // NOTE: jangan retry 429 di sini — biar rotasi key yang handle.
   let lastError: any;
   for (let i = 0; i < retries; i++) {
     try {
@@ -162,7 +150,7 @@ export const findTrendingTopic = async (style: VideoStyle): Promise<string> => {
       BUDAYA_NUSANTARA: "upacara adat, ritual sakral, atau tradisi suku bangsa di Indonesia yang unik dan visual",
     };
 
-    const prompt = `Gunakan Google Search untuk menemukan 1 topik yang sangat menarik dan viral tentang ${styleDescriptions[style]}. 
+    const prompt = `Gunakan Google Search untuk menemukan 1 topik yang sangat menarik dan viral tentang ${styleDescriptions[style]}.
 Topik harus memiliki potensi konflik, drama, atau visual epik untuk diorama makro.
 Berikan HANYA judul pendek (maks 5 kata). Jangan ada penjelasan tambahan.`;
 
@@ -181,33 +169,23 @@ Berikan HANYA judul pendek (maks 5 kata). Jangan ada penjelasan tambahan.`;
 export const generateVideoScript = async (project: VideoProject): Promise<{ scenes: Scene[] }> => {
   return await withRotatingApiKey(async (ai) => {
     const systemInstruction = `
-Kamu adalah "Director + Historian + Cinematographer" untuk serial NUSANTARA DIORAMA AI. 
+Kamu adalah "Director + Historian + Cinematographer" untuk serial NUSANTARA DIORAMA AI.
 Fokus kamu: VISUAL EPIC, DAHSYAT, penuh aksi, tidak sepi, tidak monoton.
 
 TUGAS: Buat 9 panel skrip sinematik untuk: "${project.topic}".
 
 PROSEDUR WAJIB PER PANEL:
-1. NARASI: 
-   - Gunakan gaya bahasa FILM DOKUMENTER yang CEPAT, LUGAS, dan MENGALUN.
-   - Narasi harus terasa bercerita, bukan sekadar memberikan informasi kering.
-   - DILARANG menggunakan gaya bahasa pantun, rima akhir, atau bahasa puitis yang dipaksakan.
-   - PANJANG NARASI: Harus berkisar antara 25 sampai 32 kata agar durasi bicaranya pas sekitar 10-12 detik per panel. JANGAN KURANG DAN JANGAN LEBIH.
-   - Fokus pada fakta mendalam, suasana saat itu, dan tensi kejadian.
+1. NARASI:
+   - Gaya film dokumenter, cepat, lugas, mengalun.
+   - 25 sampai 32 kata per panel.
 
-2. VISUAL THESIS: Tentukan makna gambar untuk panel A (Setup) dan B (Klimaks).
-3. PROMPT GENERATION:
-   - Panel A (SETUP): Membangun skala & ancaman (menegangkan, ramai, detail). Wide establishing shot atau high vantage.
-   - Panel B (KLIMAKS): Momen pengungkapan/konsekuensi (lebih brutal/menohok, lebih ramai, lebih dramatis). Closer dramatic shot atau low-angle action.
+2. Panel A (SETUP): establishing shot, ancaman, ramai.
+3. Panel B (KLIMAKS): lebih dramatis, lebih ramai, lebih dekat.
 
-ATURAN "EPIC":
-- JANGAN ADA FRAME SEPI. Minimal 8-20 figur manusia terlihat bekerja/berteriak/berlari/menonton/menunjuk.
-- Tambahkan elemen skala: tembok benteng besar, menara raksasa, dermaga panjang, kapal uap, awan gelap, asap mesiu, debris.
-- Komposisi dinamis: Diagonal lines, leading lines, framing.
-- Atmosfer: Debu, kabut, asap, hujan gerimis, cahaya temaram.
-
-GAYA VISUAL: ${MASTER_VISUAL_LOCK}
-
-Format: JSON valid sesuai schema.`;
+ATURAN:
+- JANGAN ADA FRAME SEPI. Minimal 8-20 figur manusia terlihat.
+- No teks/watermark/modern objects/CGI look.
+`;
 
     const response = await retryApiCall<GenerateContentResponse>(() =>
       ai.models.generateContent({
@@ -235,19 +213,15 @@ Format: JSON valid sesuai schema.`;
             required: ["scenes"],
           },
         },
-        contents: `Buat 9 panel skrip diorama makro EPIC untuk: ${project.topic}. Gaya: ${project.style}. Gunakan narasi gaya film dokumenter yang lugas, mengalir, dan berisi tepat 25-32 kata per panel untuk target durasi 12 detik.`,
+        contents: `Buat 9 panel skrip diorama makro EPIC untuk: ${project.topic}. Gaya: ${project.style}.`,
       })
     );
 
     const text = response.text || '{"scenes":[]}';
-    try {
-      const res = JSON.parse(text);
-      return {
-        scenes: (res.scenes || []).map((s: any, i: number) => ({ id: `scene-${i}`, ...s })),
-      };
-    } catch {
-      throw new Error("Gagal memproses skrip.");
-    }
+    const res = JSON.parse(text);
+    return {
+      scenes: (res.scenes || []).map((s: any, i: number) => ({ id: `scene-${i}`, ...s })),
+    };
   });
 };
 
@@ -261,19 +235,19 @@ export const generateSceneImage = async (
     const stylePrompt = STYLE_PROMPTS[style];
 
     const visualLockInstruction = `
-EPIC SCENE RULES: 
+EPIC SCENE RULES:
 - NO EMPTY FRAMES. Crowded with at least 15+ tiny figurines in action.
 - SENSE OF SCALE: Large infrastructures vs small workers.
-- DOCUMENTARY STYLE: Archival photo look, slightly desaturated earthy tones.
-- TEXTURES: Wet mud, weathered wood, mossy stones, rusted iron.
-- ATMOSPHERE: Humid, smoky, dusty, or rainy Indonesian tropical vibes.
-- TILT-SHIFT EFFECT: Use professional shallow depth of field, blurred background and foreground to emphasize the macro miniature scale.
-- NO CGI GLOSSY LOOK. 
-Everything captured as a high-end realistic miniature diorama.
+- DOCUMENTARY STYLE: Archival photo look, earthy tones.
+- TEXTURES: wet mud, weathered wood, mossy stones, rusted iron.
+- ATMOSPHERE: humid, smoky, dusty, rainy Indonesian tropical vibes.
+- TILT-SHIFT effect strong. Macro shallow DOF.
+- No text, no watermark, no modern elements, no CGI glossy look.
 `;
 
-    const fullPrompt = `${stylePrompt}. 
-SPECIFIC SCENE: ${prompt}. 
+    const fullPrompt = `${stylePrompt}
+SCENE: ${prompt}
+ASPECT RATIO: ${aspectRatio}
 ${visualLockInstruction}`;
 
     const parts: any[] = [{ text: fullPrompt }];
@@ -307,27 +281,18 @@ export const generateVoiceover = async (text: string): Promise<string | null> =>
             {
               parts: [
                 {
-                  text: `Bawakan narasi dokumenter sejarah ini sebagai KARAKTER ALGENIB (Vokal Wanita yang cerdas, bersemangat, dan berwibawa). 
-Gaya bicara harus LUGAS, MENGALUN, and TIDAK HIPERBOLA. 
-Suara harus terdengar antusias namun tetap tenang, menunjukkan penguasaan materi sejarah yang mendalam. 
-Fokus pada intonasi yang mengalir lancar, memberikan penekanan pada momen-momen penting tanpa rima yang dipaksakan. 
-Teks Narasi: ${text}`,
+                  text: `Buat voiceover Bahasa Indonesia yang natural, tegas, jelas, dan enak didengar.\n\nSCRIPT:\n${text}`,
                 },
               ],
             },
           ],
-          config: {
-            responseModalities: [Modality.AUDIO],
-            speechConfig: {
-              voiceConfig: {
-                prebuiltVoiceConfig: { voiceName: "Algenib" },
-              },
-            },
-          },
         })
       );
 
-      return (response as any)?.candidates?.[0]?.content?.parts?.[0]?.inlineData?.data || null;
+      const parts = (response as any)?.candidates?.[0]?.content?.parts || [];
+      const audio = parts.find((p: any) => p?.inlineData?.data)?.inlineData?.data;
+      if (!audio) return null;
+      return String(audio);
     } catch {
       return null;
     }
