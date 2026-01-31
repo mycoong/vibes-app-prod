@@ -2,15 +2,96 @@
 
 import { GoogleGenAI, Type, Modality, GenerateContentResponse } from "@google/genai";
 import { Scene, VideoStyle, VideoProject } from "../types";
-import { getFirstApiKey } from "../../lib/apikeyStore";
+import { pickReadyKey, markCooldown, markUsed, msToHuman } from "../../lib/apikeyStore";
 
-const getAI = () => {
-  const apiKey = getFirstApiKey();
-  if (!apiKey) throw new Error("API_KEY_MISSING: buka /settings dan isi minimal 1 API key");
-  return new GoogleGenAI({ apiKey });
-};
+const wait = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
-const wait = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
+function statusOf(err: any) {
+  return err?.status ?? err?.code ?? err?.response?.status ?? null;
+}
+
+function msgOf(err: any) {
+  return String(err?.message || err || "");
+}
+
+function isRateLimit(err: any) {
+  const s = statusOf(err);
+  const m = msgOf(err);
+  return s === 429 || /\b429\b/.test(m) || /RESOURCE_EXHAUSTED|quota|rate limit/i.test(m);
+}
+
+function isAuthInvalid(err: any) {
+  const s = statusOf(err);
+  const m = msgOf(err);
+  return s === 401 || s === 403 || /invalid api key|api key not valid|permission denied/i.test(m);
+}
+
+function isTransient(err: any) {
+  const s = statusOf(err);
+  const m = msgOf(err);
+  return s === 500 || s === 503 || /timeout|timed out|fetch failed|ECONNRESET/i.test(m);
+}
+
+function shortErr(err: any) {
+  const s = statusOf(err);
+  const m = msgOf(err).split("\n")[0].slice(0, 180);
+  return s ? `${s} ${m}`.trim() : m.trim() || "ERR";
+}
+
+async function withRotatingApiKey<T>(task: (ai: GoogleGenAI) => Promise<T>): Promise<T> {
+  const tried = new Set<string>();
+  let lastErr: any = null;
+
+  for (let attempt = 0; attempt < 5; attempt++) {
+    const pick = pickReadyKey();
+
+    if (!pick.ok) {
+      if (pick.reason === "NO_KEYS") {
+        throw new Error("API_KEY_MISSING: buka /settings dan isi minimal 1 API key");
+      }
+      const now = Date.now();
+      const ms = Math.max(0, (pick.nextReadyAt || now) - now);
+      throw new Error(`ALL_KEYS_COOLDOWN: tunggu ${msToHuman(ms)} lalu coba lagi`);
+    }
+
+    const slot = pick.slot;
+    if (tried.has(slot.id)) break;
+    tried.add(slot.id);
+
+    const ai = new GoogleGenAI({ apiKey: slot.key.trim() });
+
+    try {
+      const out = await task(ai);
+      markUsed(slot.id);
+      return out;
+    } catch (err: any) {
+      lastErr = err;
+
+      if (isRateLimit(err)) {
+        // anti 429: cooldown 2 menit, lalu coba key berikutnya
+        markCooldown(slot.id, 2 * 60 * 1000, "429");
+        continue;
+      }
+
+      if (isAuthInvalid(err)) {
+        // invalid: cooldown lama supaya tidak dipakai terus
+        markCooldown(slot.id, 30 * 60 * 1000, "INVALID");
+        continue;
+      }
+
+      if (isTransient(err)) {
+        // error sementara: cooldown pendek
+        markCooldown(slot.id, 20 * 1000, "TEMP");
+        continue;
+      }
+
+      // error lain: jangan muter, bubble up
+      throw err;
+    }
+  }
+
+  throw new Error(`ALL_KEYS_FAILED: ${shortErr(lastErr)}`);
+}
 
 const MASTER_VISUAL_LOCK = `
 MASTER VISUAL LOCK — PROFESSIONAL DIORAMA MACRO PHOTOGRAPHY:
@@ -47,21 +128,22 @@ DILARANG:
 `;
 
 const STYLE_PROMPTS: Record<VideoStyle, string> = {
-  'ERA_KOLONIAL': `Indonesian Colonial Era (Hindia Belanda). Fokus pada kanal lama Batavia, arsitektur VOC lapuk, pelabuhan ramai, and infrastruktur masif. ${MASTER_VISUAL_LOCK}`,
-  'SEJARAH_PERJUANGAN': `Indonesian Independence Struggle. Fokus pada taktik gerilya, hutan tropis lembap, bambu runcing, reruntuhan batu berlumut, and kerumunan warga. ${MASTER_VISUAL_LOCK}`,
-  'LEGENDA_RAKYAT': `Indonesian Folklore. Fokus pada lanskap mistis nusantara, desa tradisional terpencil, and elemen mistis yang terasa sebagai miniatur fisik nyata. ${MASTER_VISUAL_LOCK}`,
-  'BUDAYA_NUSANTARA': `Indonesian Cultural Heritage. Fokus pada upacara adat kolosal, pasar tradisional ramai, rumah Joglo/Gadang, and detail kostum tradisional. ${MASTER_VISUAL_LOCK}`
+  ERA_KOLONIAL: `Indonesian Colonial Era (Hindia Belanda). Fokus pada kanal lama Batavia, arsitektur VOC lapuk, pelabuhan ramai, and infrastruktur masif. ${MASTER_VISUAL_LOCK}`,
+  SEJARAH_PERJUANGAN: `Indonesian Independence Struggle. Fokus pada taktik gerilya, hutan tropis lembap, bambu runcing, reruntuhan batu berlumut, and kerumunan warga. ${MASTER_VISUAL_LOCK}`,
+  LEGENDA_RAKYAT: `Indonesian Folklore. Fokus pada lanskap mistis nusantara, desa tradisional terpencil, and elemen mistis yang terasa sebagai miniatur fisik nyata. ${MASTER_VISUAL_LOCK}`,
+  BUDAYA_NUSANTARA: `Indonesian Cultural Heritage. Fokus pada upacara adat kolosal, pasar tradisional ramai, rumah Joglo/Gadang, and detail kostum tradisional. ${MASTER_VISUAL_LOCK}`,
 };
 
-async function retryApiCall<T>(apiCall: () => Promise<T>, retries: number = 3, initialDelay: number = 2000): Promise<T> {
+async function retryApiCall<T>(apiCall: () => Promise<T>, retries: number = 2, initialDelay: number = 1200): Promise<T> {
+  // NOTE: jangan retry 429 di sini — biar rotasi key yang handle.
   let lastError: any;
   for (let i = 0; i < retries; i++) {
     try {
       return await apiCall();
     } catch (error: any) {
       lastError = error;
-      const status = error.status || error.code;
-      if ((status === 429 || status === 500 || status === 503) && i < retries - 1) {
+      const status = statusOf(error);
+      if ((status === 500 || status === 503) && i < retries - 1) {
         await wait(initialDelay * Math.pow(2, i));
         continue;
       }
@@ -72,33 +154,33 @@ async function retryApiCall<T>(apiCall: () => Promise<T>, retries: number = 3, i
 }
 
 export const findTrendingTopic = async (style: VideoStyle): Promise<string> => {
-  const ai = getAI();
+  return await withRotatingApiKey(async (ai) => {
+    const styleDescriptions: Record<VideoStyle, string> = {
+      ERA_KOLONIAL: "peristiwa sejarah spesifik, bangunan bersejarah, atau tokoh masa Hindia Belanda/VOC yang dramatis",
+      SEJARAH_PERJUANGAN: "momen pertempuran revolusi, taktik gerilya, atau kisah heroik pahlawan Indonesia yang jarang diketahui",
+      LEGENDA_RAKYAT: "legenda rakyat nusantara yang mistis, asal-usul tempat, atau cerita rakyat daerah yang populer",
+      BUDAYA_NUSANTARA: "upacara adat, ritual sakral, atau tradisi suku bangsa di Indonesia yang unik dan visual",
+    };
 
-  const styleDescriptions: Record<VideoStyle, string> = {
-    'ERA_KOLONIAL': 'peristiwa sejarah spesifik, bangunan bersejarah, atau tokoh masa Hindia Belanda/VOC yang dramatis',
-    'SEJARAH_PERJUANGAN': 'momen pertempuran revolusi, taktik gerilya, atau kisah heroik pahlawan Indonesia yang jarang diketahui',
-    'LEGENDA_RAKYAT': 'legenda rakyat nusantara yang mistis, asal-usul tempat, atau cerita rakyat daerah yang populer',
-    'BUDAYA_NUSANTARA': 'upacara adat, ritual sakral, atau tradisi suku bangsa di Indonesia yang unik dan visual'
-  };
+    const prompt = `Gunakan Google Search untuk menemukan 1 topik yang sangat menarik dan viral tentang ${styleDescriptions[style]}. 
+Topik harus memiliki potensi konflik, drama, atau visual epik untuk diorama makro.
+Berikan HANYA judul pendek (maks 5 kata). Jangan ada penjelasan tambahan.`;
 
-  const prompt = `Gunakan Google Search untuk menemukan 1 topik yang sangat menarik dan viral tentang ${styleDescriptions[style]}. 
-  Topik harus memiliki potensi konflik, drama, atau visual epik untuk diorama makro.
-  Berikan HANYA judul pendek (maks 5 kata). Jangan ada penjelasan tambahan.`;
+    const response = await retryApiCall<GenerateContentResponse>(() =>
+      ai.models.generateContent({
+        model: "gemini-3-flash-preview",
+        contents: prompt,
+        config: { tools: [{ googleSearch: {} }] },
+      })
+    );
 
-  const response = await retryApiCall<GenerateContentResponse>(() => ai.models.generateContent({
-    model: 'gemini-3-flash-preview',
-    contents: prompt,
-    config: {
-      tools: [{ googleSearch: {} }]
-    }
-  }));
-
-  return response.text?.replace(/["']/g, "").trim() || "Misteri Gajah Mada";
+    return response.text?.replace(/["']/g, "").trim() || "Misteri Gajah Mada";
+  });
 };
 
 export const generateVideoScript = async (project: VideoProject): Promise<{ scenes: Scene[] }> => {
-  const ai = getAI();
-  const systemInstruction = `
+  return await withRotatingApiKey(async (ai) => {
+    const systemInstruction = `
 Kamu adalah "Director + Historian + Cinematographer" untuk serial NUSANTARA DIORAMA AI. 
 Fokus kamu: VISUAL EPIC, DAHSYAT, penuh aksi, tidak sepi, tidak monoton.
 
@@ -127,108 +209,127 @@ GAYA VISUAL: ${MASTER_VISUAL_LOCK}
 
 Format: JSON valid sesuai schema.`;
 
-  const response = await retryApiCall<GenerateContentResponse>(() => ai.models.generateContent({
-    model: 'gemini-3-pro-preview',
-    config: {
-      systemInstruction,
-      responseMimeType: 'application/json',
-      responseSchema: {
-        type: Type.OBJECT,
-        properties: {
-          scenes: {
-            type: Type.ARRAY,
-            items: {
-              type: Type.OBJECT,
-              properties: {
-                narrative: { type: Type.STRING },
-                imagePromptA: { type: Type.STRING },
-                imagePromptB: { type: Type.STRING },
-                videoPrompt: { type: Type.STRING }
+    const response = await retryApiCall<GenerateContentResponse>(() =>
+      ai.models.generateContent({
+        model: "gemini-3-pro-preview",
+        config: {
+          systemInstruction,
+          responseMimeType: "application/json",
+          responseSchema: {
+            type: Type.OBJECT,
+            properties: {
+              scenes: {
+                type: Type.ARRAY,
+                items: {
+                  type: Type.OBJECT,
+                  properties: {
+                    narrative: { type: Type.STRING },
+                    imagePromptA: { type: Type.STRING },
+                    imagePromptB: { type: Type.STRING },
+                    videoPrompt: { type: Type.STRING },
+                  },
+                  required: ["narrative", "imagePromptA", "imagePromptB", "videoPrompt"],
+                },
               },
-              required: ["narrative", "imagePromptA", "imagePromptB", "videoPrompt"]
-            }
-          }
+            },
+            required: ["scenes"],
+          },
         },
-        required: ["scenes"]
-      }
-    },
-    contents: `Buat 9 panel skrip diorama makro EPIC untuk: ${project.topic}. Gaya: ${project.style}. Gunakan narasi gaya film dokumenter yang lugas, mengalir, dan berisi tepat 25-32 kata per panel untuk target durasi 12 detik.`,
-  }));
+        contents: `Buat 9 panel skrip diorama makro EPIC untuk: ${project.topic}. Gaya: ${project.style}. Gunakan narasi gaya film dokumenter yang lugas, mengalir, dan berisi tepat 25-32 kata per panel untuk target durasi 12 detik.`,
+      })
+    );
 
-  const text = response.text || '{"scenes":[]}';
-  try {
-    const res = JSON.parse(text);
-    return {
-      scenes: (res.scenes || []).map((s: any, i: number) => ({ id: `scene-${i}`, ...s }))
-    };
-  } catch (e) {
-    throw new Error("Gagal memproses skrip.");
-  }
+    const text = response.text || '{"scenes":[]}';
+    try {
+      const res = JSON.parse(text);
+      return {
+        scenes: (res.scenes || []).map((s: any, i: number) => ({ id: `scene-${i}`, ...s })),
+      };
+    } catch {
+      throw new Error("Gagal memproses skrip.");
+    }
+  });
 };
 
-export const generateSceneImage = async (prompt: string, style: VideoStyle, aspectRatio: string, refImage?: string): Promise<string> => {
-  const ai = getAI();
-  const stylePrompt = STYLE_PROMPTS[style];
+export const generateSceneImage = async (
+  prompt: string,
+  style: VideoStyle,
+  aspectRatio: string,
+  refImage?: string
+): Promise<string> => {
+  return await withRotatingApiKey(async (ai) => {
+    const stylePrompt = STYLE_PROMPTS[style];
 
-  const visualLockInstruction = `
-  EPIC SCENE RULES: 
-  - NO EMPTY FRAMES. Crowded with at least 15+ tiny figurines in action.
-  - SENSE OF SCALE: Large infrastructures vs small workers.
-  - DOCUMENTARY STYLE: Archival photo look, slightly desaturated earthy tones.
-  - TEXTURES: Wet mud, weathered wood, mossy stones, rusted iron.
-  - ATMOSPHERE: Humid, smoky, dusty, or rainy Indonesian tropical vibes.
-  - TILT-SHIFT EFFECT: Use professional shallow depth of field, blurred background and foreground to emphasize the macro miniature scale.
-  - NO CGI GLOSSY LOOK. 
-  Everything captured as a high-end realistic miniature diorama.
-  `;
+    const visualLockInstruction = `
+EPIC SCENE RULES: 
+- NO EMPTY FRAMES. Crowded with at least 15+ tiny figurines in action.
+- SENSE OF SCALE: Large infrastructures vs small workers.
+- DOCUMENTARY STYLE: Archival photo look, slightly desaturated earthy tones.
+- TEXTURES: Wet mud, weathered wood, mossy stones, rusted iron.
+- ATMOSPHERE: Humid, smoky, dusty, or rainy Indonesian tropical vibes.
+- TILT-SHIFT EFFECT: Use professional shallow depth of field, blurred background and foreground to emphasize the macro miniature scale.
+- NO CGI GLOSSY LOOK. 
+Everything captured as a high-end realistic miniature diorama.
+`;
 
-  const fullPrompt = `${stylePrompt}. 
-  SPECIFIC SCENE: ${prompt}. 
-  ${visualLockInstruction}`;
+    const fullPrompt = `${stylePrompt}. 
+SPECIFIC SCENE: ${prompt}. 
+${visualLockInstruction}`;
 
-  const parts: any[] = [{ text: fullPrompt }];
-  if (refImage) {
-    parts.unshift({ inlineData: { mimeType: 'image/jpeg', data: refImage } });
-  }
+    const parts: any[] = [{ text: fullPrompt }];
+    if (refImage) {
+      parts.unshift({ inlineData: { mimeType: "image/jpeg", data: refImage } });
+    }
 
-  const response = await retryApiCall<GenerateContentResponse>(() => ai.models.generateContent({
-    model: 'gemini-2.5-flash-image',
-    contents: { parts },
-    config: { imageConfig: { aspectRatio: aspectRatio as any } }
-  }));
+    const response = await retryApiCall<GenerateContentResponse>(() =>
+      ai.models.generateContent({
+        model: "gemini-2.5-flash-image",
+        contents: { parts },
+        config: { imageConfig: { aspectRatio: aspectRatio as any } },
+      })
+    );
 
-  for (const part of response.candidates?.[0]?.content?.parts || []) {
-  const data = part?.inlineData?.data;
-  if (typeof data === "string" && data.length > 0) return data;
-}
-throw new Error("Gagal generate gambar.");
+    for (const part of response.candidates?.[0]?.content?.parts || []) {
+      const data = (part as any)?.inlineData?.data;
+      if (typeof data === "string" && data.length > 0) return data;
+    }
+    throw new Error("Gagal generate gambar.");
+  });
 };
 
 export const generateVoiceover = async (text: string): Promise<string | null> => {
-  const ai = getAI();
-  try {
-    const response = await retryApiCall<GenerateContentResponse>(() => ai.models.generateContent({
-      model: "gemini-2.5-flash-preview-tts",
-      contents: [{
-        parts: [{
-          text: `Bawakan narasi dokumenter sejarah ini sebagai KARAKTER ALGENIB (Vokal Wanita yang cerdas, bersemangat, dan berwibawa). 
-          Gaya bicara harus LUGAS, MENGALUN, and TIDAK HIPERBOLA. 
-          Suara harus terdengar antusias namun tetap tenang, menunjukkan penguasaan materi sejarah yang mendalam. 
-          Fokus pada intonasi yang mengalir lancar, memberikan penekanan pada momen-momen penting tanpa rima yang dipaksakan. 
-          Teks Narasi: ${text}`
-        }]
-      }],
-      config: {
-        responseModalities: [Modality.AUDIO],
-        speechConfig: {
-          voiceConfig: {
-            prebuiltVoiceConfig: { voiceName: 'Algenib' }
-          }
-        },
-      },
-    }));
-    return response.candidates?.[0]?.content?.parts?.[0]?.inlineData?.data || null;
-  } catch (e) {
-    return null;
-  }
+  return await withRotatingApiKey(async (ai) => {
+    try {
+      const response = await retryApiCall<GenerateContentResponse>(() =>
+        ai.models.generateContent({
+          model: "gemini-2.5-flash-preview-tts",
+          contents: [
+            {
+              parts: [
+                {
+                  text: `Bawakan narasi dokumenter sejarah ini sebagai KARAKTER ALGENIB (Vokal Wanita yang cerdas, bersemangat, dan berwibawa). 
+Gaya bicara harus LUGAS, MENGALUN, and TIDAK HIPERBOLA. 
+Suara harus terdengar antusias namun tetap tenang, menunjukkan penguasaan materi sejarah yang mendalam. 
+Fokus pada intonasi yang mengalir lancar, memberikan penekanan pada momen-momen penting tanpa rima yang dipaksakan. 
+Teks Narasi: ${text}`,
+                },
+              ],
+            },
+          ],
+          config: {
+            responseModalities: [Modality.AUDIO],
+            speechConfig: {
+              voiceConfig: {
+                prebuiltVoiceConfig: { voiceName: "Algenib" },
+              },
+            },
+          },
+        })
+      );
+
+      return (response as any)?.candidates?.[0]?.content?.parts?.[0]?.inlineData?.data || null;
+    } catch {
+      return null;
+    }
+  });
 };
