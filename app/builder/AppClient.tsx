@@ -2,6 +2,7 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import JSZip from "jszip";
+import GlobalAudioPanel from "./components/GlobalAudioPanel";
 
 type Scene = {
   id: string;
@@ -388,6 +389,11 @@ export default function AppClient() {
   // audio play/pause
   const audioElRef = useRef<HTMLAudioElement | null>(null);
   const [playingIndex, setPlayingIndex] = useState<number | null>(null);
+  const [globalScript, setGlobalScript] = useState<string>("");
+  const [globalAudioUrl, setGlobalAudioUrl] = useState<string | null>(null);
+  const [globalAudioLoading, setGlobalAudioLoading] = useState<boolean>(false);
+  const [globalAudioError, setGlobalAudioError] = useState<string>("");
+const [globalPlaying, setGlobalPlaying] = useState<boolean>(false);
   const [isPaused, setIsPaused] = useState(true);
 
   const meta: GenerateMeta = useMemo(() => {
@@ -425,6 +431,45 @@ export default function AppClient() {
       }
     } catch {}
   }, []);
+useEffect(() => {
+  if (!globalScript.trim() && scenes.length) {
+    const raw = scenes
+      .map((x) => String(x.narrative || "").trim())
+      .filter(Boolean)
+      .join(" ");
+
+    const s = raw.replace(/\s+/g, " ").trim();
+
+    const sentences = s
+      .split(/(?<=[.!?])\s+/)
+      .map((x) => x.trim())
+      .filter(Boolean);
+
+    const hook = sentences.slice(0, 2).join(" ").trim() || "Tidak semua kisah dimulai dengan harapan.";
+    const setup = sentences.slice(2, 4).join(" ").trim();
+    const escalation = sentences.slice(4, 7).join(" ").trim();
+    const detail = sentences.slice(7, 10).join(" ").trim();
+    const climax = sentences.slice(10, 12).join(" ").trim();
+
+    const closing =
+      "Pada akhirnya, sejarah tidak selalu mengingat siapa yang paling keras bersuara, melainkan siapa yang berani bertahan sampai akhir.";
+
+    const cta =
+      "Jika kisah ini meninggalkan bekas, simpan videonya.";
+
+    const storyParts = [hook, setup, escalation, detail, climax, closing, "", cta]
+      .map((x) => String(x || "").trim());
+
+    const story = storyParts
+      .filter((x, i) => (x ? true : i === storyParts.length - 2))
+      .join("\n\n")
+      .replace(/\n{3,}/g, "\n\n")
+      .trim();
+
+    setGlobalScript(story);
+  }
+}, [scenes]);
+
 
   function registerWhiskController(ctrl: AbortController) {
     const sid = whiskSessionIdRef.current;
@@ -552,7 +597,87 @@ export default function AppClient() {
     }
   }
 
-  async function onGenerateAudio(sceneIndex: number) {
+  
+async function onGenerateGlobalAudio(overrideText?: string) {
+  setGlobalAudioLoading(true);
+  setGlobalAudioError("");
+  try {
+    const apiKeys = getAllApiKeysFromStorage();
+    setApiCount(apiKeys.length);
+    if (!apiKeys.length) throw new Error("API_KEY_MISSING");
+
+    const text = String((overrideText ?? globalScript) || "");
+    if (!text.trim()) throw new Error("SCRIPT_EMPTY");
+
+    const res = await fetch("/api/yoso/diorama/audio", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ apiKeys, text }),
+    });
+
+    const j = await res.json();
+    if (!j?.ok || !j?.audioBase64) throw new Error(String(j?.error || "AUDIO_FAILED"));
+
+    const base64 = String(j.audioBase64);
+    const mime = String(j.audioMime || "audio/wav");
+
+    const bytes = b64ToBytes(base64);
+
+    let wavAb: ArrayBuffer;
+    if (mime.toLowerCase().includes("wav") || startsWithAscii(bytes, "RIFF")) {
+      wavAb = bytesToArrayBuffer(bytes);
+    } else {
+      const ctx = getAudioContext();
+      await ensureCtxResumed(ctx);
+      const buffer = await pcm16ToAudioBuffer(bytes, ctx, 24000, 1);
+      wavAb = audioBufferToWav(buffer);
+    }
+
+    const blob = new Blob([wavAb], { type: "audio/wav" });
+    const urlObj = URL.createObjectURL(blob);
+
+    setGlobalAudioUrl(urlObj);
+    setGlobalPlaying(false);
+    setMsg("AUDIO READY: GLOBAL");
+  } catch (e: any) {
+    const err = String(e?.message || e || "AUDIO_FAILED");
+    setGlobalAudioError(err);
+    setMsg(`AUDIO_ERROR: ${err}`);
+  } finally {
+    setGlobalAudioLoading(false);
+  }
+}
+
+async function onDownloadGlobalAudio() {
+  if (!globalAudioUrl) return;
+  const wav = await fetchAudioAsWavArrayBuffer(globalAudioUrl);
+  downloadArrayBufferAsFile(wav, `vibes_global_audio.wav`, "audio/wav");
+  setMsg("DOWNLOADED ✅ vibes_global_audio.wav");
+}
+
+
+function onToggleGlobalPlay() {
+  const el = audioElRef.current;
+  if (!el || !globalAudioUrl) return;
+  try {
+    if (el.paused) {
+      const p = el.play();
+      if (p && typeof (p as any).then === "function") {
+        (p as any).catch(() => {});
+      }
+      setGlobalPlaying(true);
+      el.onended = () => setGlobalPlaying(false);
+    } else {
+      el.pause();
+      setGlobalPlaying(false);
+    }
+  } catch {
+    // ignore
+  }
+}
+
+
+async function onGenerateAudio(sceneIndex: number) {
     const s = scenes[sceneIndex];
     if (!s) return;
 
@@ -793,6 +918,19 @@ export default function AppClient() {
         </div>
       ) : (
         <div className="list">
+
+<GlobalAudioPanel
+  scriptText={globalScript}
+  setScriptText={setGlobalScript}
+  onGenerateAudio={(t) => onGenerateGlobalAudio(t)}
+  audioUrl={globalAudioUrl}
+  isGenerating={globalAudioLoading}
+  errorText={globalAudioError}
+  onDownloadAudio={onDownloadGlobalAudio}
+  onTogglePlay={onToggleGlobalPlay}
+  isPlaying={globalPlaying}
+  audioRef={audioElRef}
+/>
           {scenes.map((s, i) => {
             const idx = i + 1;
             const panelNum = String(idx).padStart(2, "0");
@@ -803,9 +941,6 @@ export default function AppClient() {
               <div key={s.id || i} className="card">
                 <div className="cardTop">
                   <div className="badge">#{idx}</div>
-                  <button className="voiceBtn" type="button" onClick={() => onGenerateAudio(i)} disabled={!!s.audioLoading}>
-                    {s.audioLoading ? "🎤 WAIT..." : "🎤 GENERATE SUARA"}
-                  </button>
                 </div>
 
                 <div className="imgRow">
@@ -878,36 +1013,11 @@ export default function AppClient() {
                   </div>
                 </div>
 
-                <div className="quote">
-                  “{String(s.narrative || "").trim() || "Narrative belum tersedia."}”
-                </div>
-
-                <div className="audioRow">
-                  <button className="mini wide" type="button" onClick={() => onPlayOrPause(i)} disabled={!s.audioUrl}>
-                    {showPause ? "PAUSE AUDIO" : "PLAY AUDIO"}
-                  </button>
-                  <button
-                    className="mini wide"
-                    type="button"
-                    onClick={async () => {
-                      if (!s.audioUrl) return;
-                      const wav = await fetchAudioAsWavArrayBuffer(s.audioUrl);
-                      downloadArrayBufferAsFile(wav, `panel_${panelNum}.wav`, "audio/wav");
-                      setMsg(`DOWNLOADED ✅ panel_${panelNum}.wav`);
-                    }}
-                    disabled={!s.audioUrl}
-                  >
-                    DOWNLOAD AUDIO
-                  </button>
-                </div>
-
                 <div className="videoRow">
                   <button className="mini wide" type="button" onClick={() => onCopyVideoPrompt(i)}>
                     COPY PROMPT VIDEO
                   </button>
                 </div>
-
-                {s.audioError ? <div className="errInline">AUDIO: {s.audioError}</div> : null}
               </div>
             );
           })}
@@ -1258,9 +1368,8 @@ export default function AppClient() {
 
         .audioRow, .videoRow{
           margin-top: 10px;
-          display:grid;
-          grid-template-columns: 1fr 1fr;
-          gap: 8px;
+          display:flex;
+          justify-content:center;
         }
 
         .errInline{
