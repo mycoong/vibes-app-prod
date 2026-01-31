@@ -2,56 +2,101 @@ import { NextResponse } from "next/server";
 
 export const runtime = "nodejs";
 
+function normalizeKeys(apiKeys: any): string[] {
+  if (!Array.isArray(apiKeys)) return [];
+  return apiKeys.map((x) => String(x || "").trim()).filter(Boolean);
+}
+
+function isExhausted(status: number, bodyText: string) {
+  const t = String(bodyText || "");
+  return status === 429 || /RESOURCE_EXHAUSTED|quota|rate limit/i.test(t);
+}
+
 export async function POST(req: Request) {
-  const body = await req.json().catch(() => ({} as any));
+  try {
+    const body = await req.json().catch(() => ({} as any));
 
-  const apiKey = String(body?.apiKey || "").trim();
-  const text = String(body?.text || "").trim();
+    const keys = normalizeKeys(body?.apiKeys);
+    const text = String(body?.text || "").trim();
 
-  if (!apiKey) return NextResponse.json({ ok: false, error: "API_KEY_MISSING" }, { status: 400 });
-  if (!text) return NextResponse.json({ ok: false, error: "TEXT_MISSING" }, { status: 400 });
+    if (!keys.length) return NextResponse.json({ ok: false, error: "API_KEY_MISSING" }, { status: 400 });
+    if (!text) return NextResponse.json({ ok: false, error: "TEXT_MISSING" }, { status: 400 });
 
-  const prompt = `Bawakan narasi dokumenter sejarah ini sebagai KARAKTER ALGENIB (Vokal Wanita yang cerdas, bersemangat, dan berwibawa).
+    const prompt = `Bawakan narasi dokumenter sejarah ini sebagai KARAKTER ALGENIB (Vokal Wanita yang cerdas, bersemangat, dan berwibawa).
 Gaya bicara harus LUGAS, MENGALUN, dan TIDAK HIPERBOLA.
 Suara antusias namun tetap tenang, menunjukkan penguasaan materi sejarah.
 Fokus intonasi mengalir lancar, beri penekanan pada momen penting tanpa rima dipaksakan.
 Teks Narasi: ${text}`;
 
-  const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-tts:generateContent?key=${encodeURIComponent(
-    apiKey
-  )}`;
+    // start index biar tidak selalu key #1 (tanpa state)
+    const start = Date.now() % keys.length;
 
-  const r = await fetch(url, {
-    method: "POST",
-    headers: { "content-type": "application/json" },
-    body: JSON.stringify({
-      contents: [{ role: "user", parts: [{ text: prompt }] }],
-      config: {
-        responseModalities: ["AUDIO"],
-        speechConfig: {
-          voiceConfig: { prebuiltVoiceConfig: { voiceName: "Algenib" } },
-        },
-      },
-    }),
-  });
+    let lastErrText = "";
+    for (let i = 0; i < keys.length; i++) {
+      const key = keys[(start + i) % keys.length];
 
-  if (r.status === 429) return NextResponse.json({ ok: false, error: "RESOURCE_EXHAUSTED" }, { status: 429 });
+      const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-tts:generateContent?key=${encodeURIComponent(
+        key
+      )}`;
 
-  if (!r.ok) {
-    const t = await r.text().catch(() => "");
-    return NextResponse.json({ ok: false, error: `GEMINI_HTTP_${r.status}:${t.slice(0, 240)}` }, { status: 400 });
+      const r = await fetch(url, {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          contents: [{ role: "user", parts: [{ text: prompt }] }],
+          generationConfig: {
+            responseModalities: ["AUDIO"],
+            speechConfig: {
+              voiceConfig: { prebuiltVoiceConfig: { voiceName: "Algenib" } },
+            },
+          },
+        }),
+      });
+
+      const rawText = await r.text().catch(() => "");
+      lastErrText = rawText || lastErrText;
+
+      // Kalau exhausted → coba key berikutnya
+      if (isExhausted(r.status, rawText)) continue;
+
+      // Kalau non-OK lain → stop (bukan masalah quota)
+      if (!r.ok) {
+        return NextResponse.json(
+          { ok: false, error: `GEMINI_HTTP_${r.status}:${String(rawText).slice(0, 240)}` },
+          { status: 400 }
+        );
+      }
+
+      // OK → parse JSON
+      const j = (() => {
+        try {
+          return JSON.parse(rawText || "{}");
+        } catch {
+          return {} as any;
+        }
+      })();
+
+      const partsOut = j?.candidates?.[0]?.content?.parts || [];
+      const inline = partsOut.find((p: any) => p?.inlineData?.data);
+
+      if (!inline?.inlineData?.data) {
+        return NextResponse.json({ ok: false, error: "NO_AUDIO_RETURNED" }, { status: 400 });
+      }
+
+      return NextResponse.json({
+        ok: true,
+        audioMime: String(inline.inlineData.mimeType || "audio/wav"),
+        audioBase64: String(inline.inlineData.data),
+        voice: "Algenib",
+      });
+    }
+
+    // Semua key exhausted
+    return NextResponse.json(
+      { ok: false, error: "RESOURCE_EXHAUSTED_ALL_KEYS", detail: String(lastErrText).slice(0, 200) },
+      { status: 429 }
+    );
+  } catch (e: any) {
+    return NextResponse.json({ ok: false, error: e?.message || "AUDIO_ERROR" }, { status: 500 });
   }
-
-  const j = await r.json().catch(() => ({} as any));
-  const partsOut = j?.candidates?.[0]?.content?.parts || [];
-  const inline = partsOut.find((p: any) => p?.inlineData?.data);
-
-  if (!inline?.inlineData?.data) return NextResponse.json({ ok: false, error: "NO_AUDIO_RETURNED" }, { status: 400 });
-
-  return NextResponse.json({
-    ok: true,
-    mimeType: String(inline.inlineData.mimeType || "audio/wav"),
-    data: String(inline.inlineData.data),
-    voice: "Algenib",
-  });
 }
