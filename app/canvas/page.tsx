@@ -93,7 +93,6 @@ function buildScenePack(scene: Scene, idx1: number) {
 }
 
 function buildChatPrompt(scene: Scene, idx1: number, meta?: Partial<GenerateMeta> | null) {
-  // Ini murni helper teks: siap paste ke model mana pun.
   const ctx = [
     `PROJECT: Vibes App (Diorama Panels)`,
     meta?.topic ? `TOPIC: ${meta.topic}` : null,
@@ -216,6 +215,18 @@ export default function CanvasHelperPage() {
     }
   }, [savedAt]);
 
+  const metaParts = useMemo(() => {
+    if (!meta) return [];
+    const p: Array<[string, string]> = [];
+    if (meta.topic) p.push(["Topic", meta.topic]);
+    if (meta.style) p.push(["Cat", meta.style]);
+    if (meta.format) p.push(["Fmt", meta.format]);
+    if (meta.audience) p.push(["Aud", meta.audience]);
+    if (meta.genre) p.push(["Gen", meta.genre]);
+    if (meta.template) p.push(["Tpl", meta.template]);
+    return p;
+  }, [meta]);
+
   async function onCopy(text: string, label: string) {
     try {
       await copyText(text);
@@ -273,36 +284,36 @@ export default function CanvasHelperPage() {
 
   return (
     <div className="wrap">
-      <div className="topRow">
-        <div className="badgeRow">
-          <span className="pill ok">CANVAS</span>
-          <span className="pill">{hasData ? `SCENES: ${scenes.length}` : "SCENES: -"}</span>
-          <span className="pill">{`SAVED: ${savedAtLabel}`}</span>
-        </div>
-
-        <div className="rightBtns">
-          <button className="btn ghost" type="button" onClick={onBackBuilder}>
-            ← BACK IDE
-          </button>
-          <button className="btn ghost" type="button" onClick={onBackPanels}>
-            ← PANELS
-          </button>
-
-          <button className="btn" type="button" onClick={onCopyBulk18} disabled={!mounted || !scenes.length}>
-            COPY BULK 18
-          </button>
-
-          <button className="btn ghost" type="button" onClick={loadFromStorage}>
-            REFRESH
-          </button>
-
-          <Link className="settingsBtn" href="/settings">
-            SETTINGS
-          </Link>
-        </div>
-      </div>
-
       <div className="stage">
+        <div className="topRow">
+          <div className="badgeRow">
+            <span className="pill ok">CANVAS</span>
+            <span className="pill">{hasData ? `SCENES: ${scenes.length}` : "SCENES: -"}</span>
+            <span className="pill">{`SAVED: ${savedAtLabel}`}</span>
+          </div>
+
+          <div className="rightBtns">
+            <button className="btn ghost" type="button" onClick={onBackBuilder}>
+              ← BACK IDE
+            </button>
+            <button className="btn ghost" type="button" onClick={onBackPanels}>
+              ← PANELS
+            </button>
+
+            <button className="btn" type="button" onClick={onCopyBulk18} disabled={!mounted || !scenes.length}>
+              COPY BULK 18
+            </button>
+
+            <button className="btn ghost" type="button" onClick={loadFromStorage}>
+              REFRESH
+            </button>
+
+            <Link className="settingsBtn" href="/settings">
+              SETTINGS
+            </Link>
+          </div>
+        </div>
+
         <div className="card hero">
           <div className="heroLeft">
             <div className="vibesLogo">Vibes Canvas</div>
@@ -310,7 +321,22 @@ export default function CanvasHelperPage() {
           </div>
 
           <div className="heroRight">
-            <div className="metaLine">{metaLine}</div>
+            <div className="metaWrap">
+              {metaParts.length ? (
+                metaParts.map(([k, v]) => (
+                  <span className="metaChip" key={`${k}:${v}`}>
+                    <span className="metaK">{k}</span>
+                    <span className="metaV">{v}</span>
+                  </span>
+                ))
+              ) : (
+                <span className="metaChip muted">
+                  <span className="metaK">Meta</span>
+                  <span className="metaV">{metaLine}</span>
+                </span>
+              )}
+            </div>
+
             {msg ? <div className="msg">{msg}</div> : <div className="msg muted">Ready.</div>}
           </div>
         </div>
@@ -372,12 +398,12 @@ export default function CanvasHelperPage() {
           <main className="card right">
             <div className="sectionHead">
               <div className="label pink">HELPER</div>
-              <div className="smallMuted">{active ? `SCENE #${activeIndex + 1}` : "Pilih scene di kiri."}</div>
+              <div className="smallMuted">{active ? `SCENE #${activeIndex + 1}` : "Pilih scene di atas."}</div>
             </div>
 
             {!active ? (
               <div className="canvasEmpty">
-                <div className="emptyTitle">Pilih scene di kiri.</div>
+                <div className="emptyTitle">Pilih scene di atas.</div>
                 <div className="emptySub">Nanti helper pack & chat prompt muncul di sini.</div>
               </div>
             ) : (
@@ -459,25 +485,35 @@ export default function CanvasHelperPage() {
 
         .wrap{
           min-height: 100vh;
-          background: radial-gradient(1200px 800px at 20% 0%, #0b1b3a 0%, #060a14 60%, #050712 100%);
-          padding: 18px;
-          font-family: ui-rounded, "Comic Sans MS", "Trebuchet MS", system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif;
-          color: #fff;
+          background:
+            radial-gradient(1100px 700px at 15% 0%, rgba(34,211,238,.22) 0%, rgba(11,18,32,0) 55%),
+            radial-gradient(900px 600px at 90% 10%, rgba(255,107,214,.16) 0%, rgba(11,18,32,0) 60%),
+            radial-gradient(1200px 800px at 30% 110%, rgba(255,216,74,.12) 0%, rgba(11,18,32,0) 55%),
+            linear-gradient(180deg, #0b1220 0%, #070b14 55%, #050712 100%);
+          padding: 12px;
+          color: #e5e7eb;
           position: relative;
+        }
+
+        .stage{
+          max-width: 520px;
+          margin: 0 auto;
+          display:flex;
+          flex-direction:column;
+          gap: 14px;
         }
 
         .topRow{
           display:flex;
           align-items:center;
           justify-content:space-between;
-          gap: 12px;
+          gap: 10px;
           flex-wrap:wrap;
-          margin-bottom: 12px;
         }
 
         .badgeRow{
           display:flex;
-          gap: 10px;
+          gap: 8px;
           flex-wrap:wrap;
           align-items:center;
         }
@@ -486,21 +522,22 @@ export default function CanvasHelperPage() {
           display:inline-flex;
           align-items:center;
           gap:8px;
-          padding: 8px 12px;
+          padding: 7px 10px;
           border: 3px solid #000;
-          background: rgba(255,255,255,0.10);
+          background: rgba(255,255,255,0.08);
           border-radius: 999px;
           font-weight: 900;
-          font-size: 12px;
+          font-size: 11px;
           letter-spacing: .5px;
           box-shadow: 0 6px 0 rgba(0,0,0,.35);
           text-transform: uppercase;
+          backdrop-filter: blur(6px);
         }
         .pill.ok{ background:#79ff86; color:#05120a; }
 
         .rightBtns{
           display:flex;
-          gap:10px;
+          gap:8px;
           flex-wrap:wrap;
           justify-content:flex-end;
           align-items:center;
@@ -510,7 +547,7 @@ export default function CanvasHelperPage() {
           background:#ffd84a;
           border: 3px solid #000;
           border-radius: 14px;
-          padding: 10px 12px;
+          padding: 8px 10px;
           font-weight: 1000;
           cursor:pointer;
           box-shadow: 0 7px 0 rgba(0,0,0,.35);
@@ -523,8 +560,9 @@ export default function CanvasHelperPage() {
         .btn:active{ transform: translateY(2px); box-shadow: 0 5px 0 rgba(0,0,0,.35); }
         .btn:disabled{ opacity:.5; cursor:not-allowed; }
         .btn.ghost{
-          background: rgba(255,255,255,0.10);
-          color:#fff;
+          background: rgba(255,255,255,0.08);
+          color:#e5e7eb;
+          backdrop-filter: blur(6px);
         }
 
         .settingsBtn{
@@ -534,7 +572,7 @@ export default function CanvasHelperPage() {
           background:#00e0ff;
           border: 3px solid #000;
           border-radius: 14px;
-          padding: 10px 12px;
+          padding: 8px 10px;
           font-weight: 1000;
           box-shadow: 0 7px 0 rgba(0,0,0,.35);
           text-decoration:none;
@@ -545,71 +583,132 @@ export default function CanvasHelperPage() {
         }
         .settingsBtn:active{ transform: translateY(2px); box-shadow: 0 5px 0 rgba(0,0,0,.35); }
 
-        .stage{
-          max-width: 1200px;
-          margin: 0 auto;
-        }
-
         .card{
           border: 4px solid #000;
-          border-radius: 18px;
-          background: rgba(255,255,255,0.07);
+          border-radius: 22px;
+          background: linear-gradient(180deg, rgba(255,255,255,.92) 0%, rgba(245,247,250,.90) 100%);
           box-shadow: 0 12px 0 rgba(0,0,0,.35);
+          color: #0b1220;
+          position: relative;
+          overflow: hidden;
+        }
+        .card::before{
+          content:"";
+          position:absolute;
+          inset:0;
+          pointer-events:none;
+          opacity:.10;
+          background:
+            repeating-linear-gradient(
+              0deg,
+              rgba(0,0,0,.25) 0px,
+              rgba(0,0,0,.25) 1px,
+              rgba(255,255,255,0) 2px,
+              rgba(255,255,255,0) 6px
+            );
+          mix-blend-mode: soft-light;
         }
 
         .hero{
           display:flex;
-          gap: 14px;
-          padding: 14px;
-          align-items:stretch;
+          gap: 12px;
+          padding: 14px 14px 14px;
+          align-items:flex-start;
           justify-content:space-between;
-          margin-bottom: 14px;
           flex-wrap:wrap;
         }
-        .heroLeft{ min-width: 240px; }
-        .heroRight{ display:flex; flex-direction:column; gap:8px; min-width: 260px; flex:1; align-items:flex-end; }
+        .heroLeft{ min-width: 220px; position: relative; z-index: 1; }
+        .heroRight{
+          display:flex;
+          flex-direction:column;
+          gap:10px;
+          min-width: 220px;
+          flex:1;
+          align-items:flex-end;
+          position: relative;
+          z-index: 1;
+        }
+
+        /* TITLE: professional (no all-caps scream) */
         .vibesLogo{
           font-weight: 1000;
-          font-size: 22px;
-          letter-spacing: .6px;
-          text-transform: uppercase;
+          font-size: 20px;
+          letter-spacing: .2px;
+          text-transform: none;
+          line-height: 1.15;
         }
+
+        /* SLOGAN: calm + readable */
         .vibesSlogan{
-          opacity: .85;
           margin-top: 6px;
           font-weight: 800;
           font-size: 12px;
+          line-height: 1.35;
+          opacity: .82;
+          max-width: 44ch;
         }
-        .metaLine{
-          font-weight: 900;
-          font-size: 12px;
-          opacity: .9;
-          text-align:right;
+
+        /* META: chips wrap, looks “designed” */
+        .metaWrap{
+          display:flex;
+          flex-wrap:wrap;
+          gap: 8px;
+          justify-content:flex-end;
+          align-items:flex-start;
+          max-width: 520px;
         }
+        .metaChip{
+          display:inline-flex;
+          align-items:center;
+          gap: 8px;
+          padding: 6px 10px;
+          border: 2px solid rgba(0,0,0,.85);
+          border-radius: 999px;
+          background: rgba(11,18,32,.06);
+          box-shadow: 0 6px 0 rgba(0,0,0,.22);
+          white-space: nowrap;
+        }
+        .metaChip.muted{ opacity:.75; }
+        .metaK{
+          font-weight: 1000;
+          font-size: 10px;
+          letter-spacing: .6px;
+          text-transform: uppercase;
+          color: rgba(11,18,32,.70);
+        }
+        .metaV{
+          font-weight: 1000;
+          font-size: 11px;
+          color: rgba(11,18,32,.92);
+        }
+
         .msg{
           font-weight: 1000;
-          font-size: 12px;
+          font-size: 11px;
           padding: 8px 10px;
           border: 3px solid #000;
           border-radius: 14px;
-          background: rgba(0,0,0,.25);
+          background: rgba(11,18,32,.06);
           max-width: 520px;
           text-align:right;
+          color: #0b1220;
         }
         .msg.muted{ opacity:.75; }
 
-        .grid{
-          display:grid;
-          grid-template-columns: 360px 1fr;
-          gap: 14px;
-        }
-        @media (max-width: 980px){
-          .grid{ grid-template-columns: 1fr; }
+        @media (max-width: 520px){
           .heroRight{ align-items:flex-start; }
-          .metaLine, .msg{ text-align:left; }
+          .metaWrap{ justify-content:flex-start; }
+          .msg{ text-align:left; }
+          .metaChip{ white-space: normal; }
         }
 
-        .left, .right{ padding: 12px; }
+        .grid{
+          display:grid;
+          grid-template-columns: 1fr;
+          gap: 14px;
+        }
+
+        .left, .right{ padding: 12px; position: relative; z-index: 1; }
 
         .sectionHead{
           display:flex;
@@ -638,18 +737,26 @@ export default function CanvasHelperPage() {
 
         .smallMuted{
           font-size: 12px;
-          opacity: .8;
+          opacity: .78;
           font-weight: 800;
+          color: rgba(11,18,32,.85);
         }
 
         .empty{
           padding: 14px;
-          border: 3px dashed rgba(255,255,255,0.25);
+          border: 3px dashed rgba(0,0,0,0.22);
           border-radius: 14px;
-          background: rgba(0,0,0,.18);
+          background: rgba(11,18,32,.04);
         }
-        .emptyTitle{ font-size: 16px; font-weight: 1000; }
-        .emptySub{ margin-top: 6px; opacity:.9; font-weight: 800; font-size: 12px; line-height: 1.35; }
+        .emptyTitle{ font-size: 16px; font-weight: 1000; color:#0b1220; }
+        .emptySub{
+          margin-top: 6px;
+          opacity:.9;
+          font-weight: 800;
+          font-size: 12px;
+          line-height: 1.35;
+          color: rgba(11,18,32,.85);
+        }
         .mono{ font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace; }
 
         .bigBtn{
@@ -664,6 +771,7 @@ export default function CanvasHelperPage() {
           cursor:pointer;
           text-transform: uppercase;
           letter-spacing: .6px;
+          color:#05120a;
         }
         .bigBtn:active{ transform: translateY(2px); box-shadow: 0 5px 0 rgba(0,0,0,.35); }
 
@@ -679,16 +787,16 @@ export default function CanvasHelperPage() {
           gap:10px;
           width:100%;
           text-align:left;
-          background: rgba(0,0,0,.22);
+          background: rgba(11,18,32,.05);
           border: 3px solid #000;
           border-radius: 14px;
           padding: 10px;
-          color:#fff;
+          color:#0b1220;
           cursor:pointer;
           box-shadow: 0 7px 0 rgba(0,0,0,.35);
         }
         .sceneItem:active{ transform: translateY(2px); box-shadow: 0 5px 0 rgba(0,0,0,.35); }
-        .sceneItem.active{ background: rgba(255,216,74,.18); }
+        .sceneItem.active{ background: rgba(255,216,74,.26); }
 
         .sceneLeft{ display:flex; align-items:center; gap: 10px; min-width: 0; }
         .sceneIndex{
@@ -708,10 +816,8 @@ export default function CanvasHelperPage() {
           overflow:hidden;
           white-space:nowrap;
           text-overflow:ellipsis;
-          max-width: 220px;
-        }
-        @media (max-width: 980px){
-          .sceneMini{ max-width: 100%; }
+          max-width: 260px;
+          color: rgba(11,18,32,.88);
         }
 
         .sceneBadge{
@@ -726,21 +832,23 @@ export default function CanvasHelperPage() {
           box-shadow: 0 6px 0 rgba(0,0,0,.35);
         }
         .sceneBadge.ok{ background:#79ff86; color:#05120a; }
-        .sceneBadge.bad{ background: rgba(255,255,255,0.15); color:#fff; }
+        .sceneBadge.bad{ background: rgba(11,18,32,.10); color:#0b1220; }
 
         .hint{
           margin-top: 12px;
           padding-top: 12px;
-          border-top: 2px dashed rgba(255,255,255,0.18);
+          border-top: 2px dashed rgba(0,0,0,.18);
+          color: rgba(11,18,32,.9);
         }
         .hintTitle{ font-weight: 1000; text-transform: uppercase; letter-spacing: .6px; font-size: 12px; }
-        .hintText{ margin-top: 6px; opacity:.85; font-weight: 800; font-size: 12px; line-height: 1.35; }
+        .hintText{ margin-top: 6px; opacity:.9; font-weight: 800; font-size: 12px; line-height: 1.35; }
 
         .canvasEmpty{
           padding: 14px;
-          border: 3px dashed rgba(255,255,255,0.25);
+          border: 3px dashed rgba(0,0,0,0.22);
           border-radius: 14px;
-          background: rgba(0,0,0,.18);
+          background: rgba(11,18,32,.04);
+          color: rgba(11,18,32,.92);
         }
 
         .canvas{ display:flex; flex-direction:column; gap: 12px; }
@@ -753,13 +861,13 @@ export default function CanvasHelperPage() {
           flex-wrap:wrap;
         }
         .canvasLabel{ display:flex; align-items:center; gap: 10px; }
-        .bigIndex{ font-weight: 1000; font-size: 18px; }
+        .bigIndex{ font-weight: 1000; font-size: 18px; color:#0b1220; }
 
         .canvasBtns{ display:flex; gap: 10px; flex-wrap:wrap; }
 
         .miniBtn{
-          background: rgba(255,255,255,0.10);
-          color:#fff;
+          background: rgba(11,18,32,.06);
+          color:#0b1220;
           border: 3px solid #000;
           border-radius: 14px;
           padding: 10px 12px;
@@ -774,20 +882,18 @@ export default function CanvasHelperPage() {
 
         .row2{
           display:grid;
-          grid-template-columns: 1fr 1fr;
+          grid-template-columns: 1fr;
           gap: 12px;
-        }
-        @media (max-width: 980px){
-          .row2{ grid-template-columns: 1fr; }
         }
 
         .promptBox{
           border: 3px solid #000;
           border-radius: 16px;
-          background: rgba(0,0,0,.22);
+          background: rgba(11,18,32,.03);
           box-shadow: 0 10px 0 rgba(0,0,0,.35);
           overflow:hidden;
         }
+
         .promptTop{
           display:flex;
           align-items:center;
@@ -795,8 +901,9 @@ export default function CanvasHelperPage() {
           gap:10px;
           padding: 10px;
           border-bottom: 3px solid #000;
-          background: rgba(255,255,255,0.06);
+          background: rgba(255,255,255,.72);
         }
+
         .pTitle{
           font-weight: 1000;
           text-transform: uppercase;
@@ -805,7 +912,9 @@ export default function CanvasHelperPage() {
           display:flex;
           align-items:center;
           gap: 8px;
+          color:#0b1220;
         }
+
         .copyBtn{
           background:#ffd84a;
           border: 3px solid #000;
@@ -817,14 +926,15 @@ export default function CanvasHelperPage() {
           text-transform: uppercase;
           font-size: 12px;
           letter-spacing: .6px;
+          color:#111;
         }
         .copyBtn:active{ transform: translateY(2px); box-shadow: 0 5px 0 rgba(0,0,0,.35); }
 
         .area{
           width: 100%;
           min-height: 180px;
-          background: rgba(0,0,0,.25);
-          color:#fff;
+          background: rgba(11,18,32,.06);
+          color:#0b1220;
           border: none;
           outline: none;
           padding: 10px;
