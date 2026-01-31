@@ -609,10 +609,18 @@ async function onGenerateGlobalAudio(overrideText?: string) {
     const text = String((overrideText ?? globalScript) || "");
     if (!text.trim()) throw new Error("SCRIPT_EMPTY");
 
+    let voice: "male" | "female" = "female";
+    try {
+      const v = String(localStorage.getItem("YOSO_VOICE_PREF") || "").toLowerCase();
+      voice = v === "male" ? "male" : "female";
+    } catch {
+      voice = "female";
+    }
+
     const res = await fetch("/api/yoso/diorama/audio", {
       method: "POST",
       headers: { "content-type": "application/json" },
-      body: JSON.stringify({ apiKeys, text }),
+      body: JSON.stringify({ apiKeys, text, voice }),
     });
 
     const j = await res.json();

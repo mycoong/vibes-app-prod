@@ -2,101 +2,240 @@ import { NextResponse } from "next/server";
 
 export const runtime = "nodejs";
 
-function normalizeKeys(apiKeys: any): string[] {
-  if (!Array.isArray(apiKeys)) return [];
-  return apiKeys.map((x) => String(x || "").trim()).filter(Boolean);
+/* =========================
+   STYLE PROMPTS (LOCKED)
+========================= */
+
+const STYLE_FEMALE = `
+Bawakan narasi sebagai NARATOR PEREMPUAN profesional.
+Gaya bicara hangat, tenang, dan percaya diri.
+Intonasi mengalun rapi, jelas, dan mudah dipahami.
+Penekanan halus pada fakta penting dan momen menarik.
+Tempo sedang, tidak terburu-buru, tidak dramatis berlebihan.
+Artikulasi jelas, pelafalan bahasa Indonesia baku.
+`.trim();
+
+const STYLE_MALE = `
+Bawakan narasi sebagai NARATOR LAKI-LAKI dokumenter.
+Gaya bicara tegas, mantap, dan berwibawa.
+Nada suara rendah-menengah, stabil, tidak emosional berlebihan.
+Tempo sedikit lebih cepat dari normal, fokus pada kejelasan fakta.
+Penekanan kuat pada detail sejarah dan fakta penting.
+Intonasi lurus dan serius, seperti dokumenter sejarah televisi.
+`.trim();
+
+const CTA_VARIANTS = [
+  "Bagaimana pendapatmu tentang peristiwa ini?",
+  "Menurutmu, apa hal paling menarik dari cerita ini?",
+  "Kamu bisa berbagi pandanganmu tentang kisah ini di kolom komentar.",
+];
+
+function pickCTA() {
+  return CTA_VARIANTS[Math.floor(Math.random() * CTA_VARIANTS.length)];
 }
 
-function isExhausted(status: number, bodyText: string) {
-  const t = String(bodyText || "");
-  return status === 429 || /RESOURCE_EXHAUSTED|quota|rate limit/i.test(t);
+/**
+ * REAL VOICE SWITCH:
+ * - Try voice candidates for the selected gender.
+ * - If a voice is not supported, fall back to the next.
+ * - If all fail, fall back to a safe default.
+ */
+const FEMALE_VOICES = ["Algenib", "Aoede", "Callisto", "Nashira", "Sirius"];
+const MALE_VOICES = ["Orion", "Puck", "Achernar", "Rigel", "Vega"];
+
+/* =========================
+   HELPERS
+========================= */
+
+function normalizeKeys(apiKeys: any): string[] {
+  if (!Array.isArray(apiKeys)) return [];
+  return apiKeys.map((k) => String(k || "").trim()).filter(Boolean);
 }
+
+function isExhausted(status: number, body: string) {
+  return status === 429 || /RESOURCE_EXHAUSTED|quota|rate limit/i.test(body || "");
+}
+
+function isVoiceUnsupported(status: number, body: string) {
+  const t = String(body || "");
+  return (
+    status === 400 &&
+    /voiceName|voice config|voice/i.test(t) &&
+    /invalid|unknown|not found|unsupported|unrecognized|does not exist/i.test(t)
+  );
+}
+
+function safeJsonParse(s: string) {
+  try {
+    return JSON.parse(s);
+  } catch {
+    return null;
+  }
+}
+
+/* =========================
+   MAIN HANDLER
+========================= */
 
 export async function POST(req: Request) {
   try {
     const body = await req.json().catch(() => ({} as any));
 
-    const keys = normalizeKeys(body?.apiKeys);
     const text = String(body?.text || "").trim();
+    const voice = body?.voice === "male" ? "male" : "female";
+    const apiKeys = normalizeKeys(body?.apiKeys);
 
-    if (!keys.length) return NextResponse.json({ ok: false, error: "API_KEY_MISSING" }, { status: 400 });
-    if (!text) return NextResponse.json({ ok: false, error: "TEXT_MISSING" }, { status: 400 });
+    if (!text) return NextResponse.json({ ok: false, error: "TEXT_EMPTY" }, { status: 400 });
+    if (!apiKeys.length) return NextResponse.json({ ok: false, error: "API_KEYS_MISSING" }, { status: 400 });
 
-    const prompt = `Bawakan narasi dokumenter sejarah ini sebagai KARAKTER ALGENIB (Vokal Wanita yang cerdas, bersemangat, dan berwibawa).
-Gaya bicara harus LUGAS, MENGALUN, dan TIDAK HIPERBOLA.
-Suara antusias namun tetap tenang, menunjukkan penguasaan materi sejarah.
-Fokus intonasi mengalir lancar, beri penekanan pada momen penting tanpa rima dipaksakan.
-Teks Narasi: ${text}`;
+    const stylePrompt = voice === "male" ? STYLE_MALE : STYLE_FEMALE;
+    const cta = pickCTA();
 
-    // start index biar tidak selalu key #1 (tanpa state)
-    const start = Date.now() % keys.length;
+    const finalText = `
+${stylePrompt}
 
+ATURAN CTA:
+- Gunakan SATU kalimat penutup.
+- HANYA ajakan komentar ringan.
+- Jangan menyebut simpan, follow, like, subscribe.
+
+SCRIPT:
+${text}
+
+PENUTUP:
+${cta}
+`.trim();
+
+    const candidates = voice === "male" ? MALE_VOICES : FEMALE_VOICES;
+
+    const startKey = Date.now() % apiKeys.length;
     let lastErrText = "";
-    for (let i = 0; i < keys.length; i++) {
-      const key = keys[(start + i) % keys.length];
 
-      const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-tts:generateContent?key=${encodeURIComponent(
+    for (let ki = 0; ki < apiKeys.length; ki++) {
+      const key = apiKeys[(startKey + ki) % apiKeys.length];
+
+      for (let vi = 0; vi < candidates.length; vi++) {
+        const voiceName = candidates[vi];
+
+        const res = await fetch(
+          `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-tts:generateContent?key=${encodeURIComponent(
+            key
+          )}`,
+          {
+            method: "POST",
+            headers: { "content-type": "application/json" },
+            body: JSON.stringify({
+              contents: [{ role: "user", parts: [{ text: finalText }] }],
+              generationConfig: {
+                responseModalities: ["AUDIO"],
+                speechConfig: {
+                  voiceConfig: {
+                    prebuiltVoiceConfig: {
+                      voiceName,
+                    },
+                  },
+                },
+              },
+            }),
+          }
+        );
+
+        const raw = await res.text().catch(() => "");
+        lastErrText = raw || lastErrText;
+
+        if (isExhausted(res.status, raw)) {
+          break; // rotate key
+        }
+
+        if (isVoiceUnsupported(res.status, raw)) {
+          continue; // try next voice
+        }
+
+        if (!res.ok) {
+          return NextResponse.json(
+            {
+              ok: false,
+              error: `TTS_FAILED_${res.status}`,
+              detail: raw.slice(0, 260),
+              voiceRequested: voice,
+              voiceTried: voiceName,
+            },
+            { status: 400 }
+          );
+        }
+
+        const json = safeJsonParse(raw) || {};
+        const parts = json?.candidates?.[0]?.content?.parts || [];
+        const audio = parts.find((p: any) => p?.inlineData?.data);
+
+        if (!audio?.inlineData?.data) {
+          return NextResponse.json(
+            { ok: false, error: "NO_AUDIO_RETURNED", voiceRequested: voice, voiceTried: voiceName },
+            { status: 400 }
+          );
+        }
+
+        return NextResponse.json({
+          ok: true,
+          audioBase64: audio.inlineData.data,
+          audioMime: audio.inlineData.mimeType || "audio/wav",
+          voice,
+          voiceNameUsed: voiceName,
+          cta,
+        });
+      }
+    }
+
+    // last resort fallback
+    const key = apiKeys[startKey];
+    const res = await fetch(
+      `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-tts:generateContent?key=${encodeURIComponent(
         key
-      )}`;
-
-      const r = await fetch(url, {
+      )}`,
+      {
         method: "POST",
         headers: { "content-type": "application/json" },
         body: JSON.stringify({
-          contents: [{ role: "user", parts: [{ text: prompt }] }],
+          contents: [{ role: "user", parts: [{ text: finalText }] }],
           generationConfig: {
             responseModalities: ["AUDIO"],
             speechConfig: {
-              voiceConfig: { prebuiltVoiceConfig: { voiceName: "Algenib" } },
+              voiceConfig: {
+                prebuiltVoiceConfig: {
+                  voiceName: "Algenib",
+                },
+              },
             },
           },
         }),
-      });
-
-      const rawText = await r.text().catch(() => "");
-      lastErrText = rawText || lastErrText;
-
-      // Kalau exhausted → coba key berikutnya
-      if (isExhausted(r.status, rawText)) continue;
-
-      // Kalau non-OK lain → stop (bukan masalah quota)
-      if (!r.ok) {
-        return NextResponse.json(
-          { ok: false, error: `GEMINI_HTTP_${r.status}:${String(rawText).slice(0, 240)}` },
-          { status: 400 }
-        );
       }
+    );
 
-      // OK → parse JSON
-      const j = (() => {
-        try {
-          return JSON.parse(rawText || "{}");
-        } catch {
-          return {} as any;
-        }
-      })();
+    const raw = await res.text().catch(() => "");
+    lastErrText = raw || lastErrText;
 
-      const partsOut = j?.candidates?.[0]?.content?.parts || [];
-      const inline = partsOut.find((p: any) => p?.inlineData?.data);
-
-      if (!inline?.inlineData?.data) {
-        return NextResponse.json({ ok: false, error: "NO_AUDIO_RETURNED" }, { status: 400 });
+    if (res.ok) {
+      const json = safeJsonParse(raw) || {};
+      const parts = json?.candidates?.[0]?.content?.parts || [];
+      const audio = parts.find((p: any) => p?.inlineData?.data);
+      if (audio?.inlineData?.data) {
+        return NextResponse.json({
+          ok: true,
+          audioBase64: audio.inlineData.data,
+          audioMime: audio.inlineData.mimeType || "audio/wav",
+          voice,
+          voiceNameUsed: "Algenib",
+          cta,
+          fallback: true,
+        });
       }
-
-      return NextResponse.json({
-        ok: true,
-        audioMime: String(inline.inlineData.mimeType || "audio/wav"),
-        audioBase64: String(inline.inlineData.data),
-        voice: "Algenib",
-      });
     }
 
-    // Semua key exhausted
     return NextResponse.json(
-      { ok: false, error: "RESOURCE_EXHAUSTED_ALL_KEYS", detail: String(lastErrText).slice(0, 200) },
-      { status: 429 }
+      { ok: false, error: "TTS_ALL_FAILED", detail: String(lastErrText).slice(0, 260) },
+      { status: 400 }
     );
   } catch (e: any) {
-    return NextResponse.json({ ok: false, error: e?.message || "AUDIO_ERROR" }, { status: 500 });
+    return NextResponse.json({ ok: false, error: e?.message || "TTS_ERROR" }, { status: 500 });
   }
 }

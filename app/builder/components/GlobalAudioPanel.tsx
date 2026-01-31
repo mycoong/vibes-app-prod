@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useMemo } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 
 type Props = {
   scriptText: string;
@@ -18,6 +18,9 @@ type Props = {
   isPlaying?: boolean;
   audioRef?: React.RefObject<HTMLAudioElement | null>;
 };
+
+const LS_VOICE = "YOSO_VOICE_PREF";
+type VoicePref = "female" | "male";
 
 function cleanScript(input: string) {
   const s = (input || "").replace(/\r\n/g, "\n");
@@ -38,6 +41,23 @@ function cleanScript(input: string) {
     .trim();
 }
 
+function readVoicePref(): VoicePref {
+  try {
+    const v = String(localStorage.getItem(LS_VOICE) || "").toLowerCase();
+    return v === "male" ? "male" : "female";
+  } catch {
+    return "female";
+  }
+}
+
+function writeVoicePref(v: VoicePref) {
+  try {
+    localStorage.setItem(LS_VOICE, v);
+  } catch {
+    // ignore
+  }
+}
+
 export default function GlobalAudioPanel({
   scriptText,
   setScriptText,
@@ -51,6 +71,16 @@ export default function GlobalAudioPanel({
   audioRef,
 }: Props) {
   const cleanedText = useMemo(() => cleanScript(scriptText), [scriptText]);
+  const [voice, setVoice] = useState<VoicePref>("female");
+
+  useEffect(() => {
+    setVoice(readVoicePref());
+  }, []);
+
+  function onPickVoice(v: VoicePref) {
+    setVoice(v);
+    writeVoicePref(v);
+  }
 
   return (
     <section className="ga-wrap">
@@ -64,9 +94,31 @@ export default function GlobalAudioPanel({
           </div>
 
           <div className="ga-actions">
+            <div className="ga-voice" aria-label="Voice selection">
+              <div className="ga-voiceLabel">VOICE</div>
+              <div className="ga-seg">
+                <button
+                  type="button"
+                  className={`ga-chip ${voice === "female" ? "active" : ""}`}
+                  onClick={() => onPickVoice("female")}
+                >
+                  FEMALE
+                </button>
+                <button
+                  type="button"
+                  className={`ga-chip ${voice === "male" ? "active" : ""}`}
+                  onClick={() => onPickVoice("male")}
+                >
+                  MALE
+                </button>
+              </div>
+            </div>
+
             <button
               className="ga-btn ga-btnPrimary"
               onClick={() => {
+                // store voice pref so the API caller can read it (AppClient)
+                writeVoicePref(voice);
                 const next = cleanScript(cleanedText);
                 if (next !== scriptText) setScriptText(next);
                 onGenerateAudio(next);
@@ -149,11 +201,11 @@ export default function GlobalAudioPanel({
           z-index: -1;
         }
         .ga-polaroid::before {
-          transform: rotate(-1.4deg) translateY(8px);
+          transform: rotate(-1.2deg) translateY(8px);
           opacity: 0.7;
         }
         .ga-polaroid::after {
-          transform: rotate(1deg) translateY(16px);
+          transform: rotate(0.9deg) translateY(16px);
           opacity: 0.55;
         }
 
@@ -193,16 +245,16 @@ export default function GlobalAudioPanel({
         }
 
         .ga-titleText {
-          font-size: 13px;
-          font-weight: 800;
-          letter-spacing: 0.5px;
-          opacity: 0.65;
+          font-size: 14px;
+          font-weight: 1000;
+          letter-spacing: 0.6px;
+          color: rgba(0, 0, 0, 0.82);
         }
         .ga-sub {
           margin-top: 2px;
           font-size: 12px;
-          opacity: 0.6;
-          font-weight: 600;
+          color: rgba(0, 0, 0, 0.62);
+          font-weight: 700;
         }
 
         .ga-actions {
@@ -210,88 +262,152 @@ export default function GlobalAudioPanel({
           gap: 10px;
           flex-wrap: wrap;
           align-items: center;
+          justify-content: flex-end;
+        }
+
+        .ga-voice {
+          display: flex;
+          align-items: center;
+          gap: 10px;
+          padding: 8px 10px;
+          border-radius: 16px;
+          border: 3px solid rgba(0, 0, 0, 0.9);
+          background: rgba(255, 255, 255, 0.85);
+          box-shadow: 0 6px 0 rgba(0, 0, 0, 0.9);
+        }
+
+        .ga-voiceLabel {
+          font-size: 11px;
+          font-weight: 1000;
+          letter-spacing: 0.6px;
+          color: rgba(0, 0, 0, 0.7);
+        }
+
+        .ga-seg {
+          display: flex;
+          gap: 8px;
+          align-items: center;
+        }
+
+        .ga-chip {
+          border-radius: 14px;
+          padding: 8px 12px;
+          font-weight: 1000;
+          letter-spacing: 0.6px;
+          border: 3px solid rgba(0, 0, 0, 0.9);
+          background: rgba(0, 0, 0, 0.08);
+          color: rgba(0, 0, 0, 0.85);
+          cursor: pointer;
+          user-select: none;
+          box-shadow: 0 6px 0 rgba(0, 0, 0, 0.9);
+          text-transform: uppercase;
+          font-size: 11px;
+          line-height: 1;
+        }
+
+        .ga-chip:active {
+          transform: translateY(2px);
+          box-shadow: 0 4px 0 rgba(0, 0, 0, 0.9);
+        }
+
+        .ga-chip.active {
+          background: #ffd84a;
         }
 
         .ga-btn {
           border-radius: 16px;
           padding: 10px 16px;
-          font-weight: 900;
+          font-weight: 1000;
           cursor: pointer;
           user-select: none;
-          border: 3px solid rgba(0, 0, 0, 0.9);
-          background: #fff;
-          box-shadow: 0 4px 0 rgba(0, 0, 0, 0.9);
+          border: 4px solid rgba(0, 0, 0, 0.9);
+          box-shadow: 0 7px 0 rgba(0, 0, 0, 0.9);
+          letter-spacing: 0.4px;
+          text-transform: uppercase;
+          font-size: 12px;
         }
+
+        .ga-btn:active {
+          transform: translateY(2px);
+          box-shadow: 0 5px 0 rgba(0, 0, 0, 0.9);
+        }
+
         .ga-btn:disabled {
-          opacity: 0.55;
+          opacity: 0.45;
           cursor: not-allowed;
-          box-shadow: none;
         }
+
         .ga-btnPrimary {
           background: #ffffff;
         }
+
         .ga-btnPlay {
-          background: rgba(0, 0, 0, 0.04);
-          border-color: rgba(0, 0, 0, 0.55);
-          box-shadow: none;
+          background: rgba(0, 0, 0, 0.08);
         }
+
         .ga-btnGhost {
-          border-color: rgba(0, 0, 0, 0.25);
-          box-shadow: none;
-          background: rgba(0, 0, 0, 0.04);
+          background: rgba(0, 0, 0, 0.06);
         }
 
         .ga-card {
           margin-top: 12px;
           border-radius: 18px;
-          border: 3px solid rgba(0, 0, 0, 0.9);
-          background: #0b2545;
-          box-shadow: inset 0 0 0 2px rgba(255, 255, 255, 0.06);
-          padding: 14px;
+          border: 4px solid rgba(0, 0, 0, 0.9);
+          background: rgba(8, 25, 52, 0.92);
+          box-shadow: 0 8px 0 rgba(0, 0, 0, 0.9);
+          overflow: hidden;
         }
 
         .ga-textarea {
           width: 100%;
-          min-height: 180px;
-          resize: vertical;
+          min-height: 150px;
+          padding: 14px;
           border: none;
           outline: none;
+          resize: vertical;
           background: transparent;
           color: rgba(255, 255, 255, 0.96);
-
-          font-family: inherit;
-          font-size: 16px;
-          font-weight: 500;
-          line-height: 1.55;
-          letter-spacing: 0.1px;
-
-          white-space: pre-wrap;
-        }
-        .ga-textarea::placeholder {
-          color: rgba(255, 255, 255, 0.55);
-          font-weight: 600;
+          font-size: 14px;
+          font-weight: 650;
+          line-height: 1.5;
         }
 
         .ga-error {
           margin-top: 10px;
           padding: 10px 12px;
-          border-radius: 14px;
-          border: 2px solid rgba(255, 80, 80, 0.55);
-          background: rgba(255, 80, 80, 0.12);
-          font-weight: 700;
+          border-radius: 16px;
+          border: 3px solid rgba(210, 30, 30, 0.75);
+          background: rgba(255, 220, 220, 0.9);
+          color: rgba(120, 0, 0, 0.9);
+          font-weight: 900;
+          font-size: 12px;
         }
 
         .ga-preview {
           margin-top: 12px;
-          padding: 10px 12px;
-          border-radius: 16px;
-          border: 2px dashed rgba(0, 0, 0, 0.22);
-          background: rgba(0, 0, 0, 0.03);
         }
+
         .ga-previewEmpty {
+          padding: 12px;
+          border-radius: 16px;
+          border: 3px dashed rgba(0, 0, 0, 0.35);
+          background: rgba(0, 0, 0, 0.03);
+          color: rgba(0, 0, 0, 0.55);
+          font-weight: 800;
           font-size: 12px;
-          font-weight: 700;
-          opacity: 0.6;
+        }
+
+        @media (max-width: 520px) {
+          .ga-actions {
+            justify-content: flex-start;
+          }
+          .ga-btn {
+            padding: 10px 14px;
+          }
+          .ga-textarea {
+            min-height: 140px;
+            font-size: 13px;
+          }
         }
       `}</style>
     </section>
